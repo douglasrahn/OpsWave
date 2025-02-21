@@ -40,12 +40,16 @@ export async function loginUser(email: string, password: string) {
       console.log("Found client ID:", currentClientId);
 
       // Get user data from users collection
+      const uid = userCredential.user.uid;
+      console.log("Fetching user data for UID:", uid);
+
       try {
-        const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+        const userDoc = await getDoc(doc(db, "users", uid));
         if (!userDoc.exists()) {
           // If user document doesn't exist in Firestore, create it
-          await setDoc(doc(db, "users", userCredential.user.uid), {
+          await setDoc(doc(db, "users", uid), {
             email,
+            uid,  // Store the Firebase UID
             accessLevel: "MasterAdmin", // Default for now since this is the initial user
             clientId: currentClientId
           });
@@ -53,6 +57,7 @@ export async function loginUser(email: string, password: string) {
 
         return {
           ...userDoc.data(),
+          uid,  // Include UID in returned data
           clientId: currentClientId,
           email
         };
@@ -61,6 +66,7 @@ export async function loginUser(email: string, password: string) {
         // Return basic user info if we can't access the user document
         return {
           email,
+          uid,  // Include UID in returned data
           clientId: currentClientId,
           accessLevel: "MasterAdmin" // Default for now
         };
@@ -95,8 +101,11 @@ export async function loginUser(email: string, password: string) {
 export async function createUser(email: string, password: string, accessLevel: string, clientId: string) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "users", userCredential.user.uid), {
+    const uid = userCredential.user.uid;
+
+    await setDoc(doc(db, "users", uid), {
       email,
+      uid,  // Store the Firebase UID
       accessLevel,
       clientId
     });

@@ -85,9 +85,10 @@ export async function initializeDatabase() {
       "Welcome1"
     );
 
-    // Store user data in Firestore
+    // Store user data in Firestore with UID
     await setDoc(doc(db, "users", userCredential.user.uid), {
       email: "drahn@blueisland.ai",
+      uid: userCredential.user.uid,  // Store the Firebase UID
       accessLevel: "MasterAdmin",
       clientId: "0"
     });
