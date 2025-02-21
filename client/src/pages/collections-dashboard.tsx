@@ -7,52 +7,78 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
+import { toggleScenario, getScenarioStatus } from "@/lib/make-api";
 
-interface ClientSettings {
-  collectionsEnabled: boolean;
-  collectionsScenarioId: string;
+interface ScenarioSettings {
+  clientId: string;
+  serviceId: string;
+  scenarioId: string;
+  status: string;
 }
 
 export default function CollectionsDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [scenarioStatus, setScenarioStatus] = useState<string>("");
   const { toast } = useToast();
 
-  // Fetch client settings
-  const { data: clientSettings, refetch } = useQuery<ClientSettings>({
-    queryKey: ["clientSettings"],
+  const { data: scenarioSettings, refetch } = useQuery<ScenarioSettings>({
+    queryKey: ["scenarioSettings"],
     queryFn: async () => {
-      // For now, we're using the default client ID "0"
-      const docRef = doc(db, "clients", "0");
+      const docRef = doc(db, "scenarios", "0");
       const docSnap = await getDoc(docRef);
       if (!docSnap.exists()) {
-        throw new Error("Client settings not found");
+        throw new Error("Scenario settings not found");
       }
-      return docSnap.data() as ClientSettings;
+      return docSnap.data() as ScenarioSettings;
     }
   });
 
   const handleToggleService = async (checked: boolean) => {
+    if (!scenarioSettings?.scenarioId) {
+      toast({
+        title: "Error",
+        description: "No scenario ID found",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await updateDoc(doc(db, "clients", "0"), {
-        collectionsEnabled: checked
+      // Toggle the scenario in Make.com
+      await toggleScenario(scenarioSettings.scenarioId, checked);
+
+      // Update status in Firebase
+      await updateDoc(doc(db, "scenarios", "0"), {
+        status: checked ? "active" : "inactive"
       });
 
-      await refetch(); // Refresh the data
+      // Wait 3 seconds and check status
+      setTimeout(async () => {
+        try {
+          const status = await getScenarioStatus(scenarioSettings.scenarioId);
+          setScenarioStatus(status.status);
 
-      toast({
-        title: checked ? "Service Resumed" : "Service Paused",
-        description: checked 
-          ? "AI calling agent is now active" 
-          : "AI calling agent has been paused"
-      });
+          await refetch(); // Refresh the data
+
+          toast({
+            title: checked ? "Service Resumed" : "Service Paused",
+            description: checked 
+              ? "AI calling agent is now active" 
+              : "AI calling agent has been paused"
+          });
+        } catch (error) {
+          console.error("Error checking scenario status:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 3000);
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to update service status",
         variant: "destructive"
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -103,11 +129,11 @@ export default function CollectionsDashboardPage() {
           <div className="flex flex-col items-center space-y-4">
             <h2 className="text-xl font-semibold">AI Calling Agent</h2>
             <div className="flex items-center space-x-4">
-              <span className={`text-sm ${!clientSettings?.collectionsEnabled ? "text-muted-foreground" : ""}`}>
-                {clientSettings?.collectionsEnabled ? "ACTIVE" : "PAUSED"}
+              <span className={`text-sm ${scenarioSettings?.status !== 'active' ? "text-muted-foreground" : ""}`}>
+                {scenarioSettings?.status === 'active' ? "ACTIVE" : "PAUSED"}
               </span>
               <Switch
-                checked={clientSettings?.collectionsEnabled ?? false}
+                checked={scenarioSettings?.status === 'active'}
                 onCheckedChange={handleToggleService}
                 className="scale-125"
                 disabled={isLoading}
@@ -117,6 +143,11 @@ export default function CollectionsDashboardPage() {
               Toggle this switch to pause or resume the AI calling agent. 
               When paused, no new calls will be initiated.
             </p>
+            {scenarioStatus && (
+              <p className="text-sm text-muted-foreground">
+                Current scenario status: {scenarioStatus}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

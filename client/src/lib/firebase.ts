@@ -61,18 +61,18 @@ export async function initializeDatabase() {
       clientId: "0"
     });
 
-    console.log("Stored master admin user data");
-
-    // Create initial client with scenario IDs
+    // Create initial client
     await setDoc(doc(db, "clients", "0"), {
       companyName: "BlueIsland",
       url: "blueisland.ai",
-      collectionsScenarioId: "",
-      salesQualifierScenarioId: "",
-      surveyScenarioId: "",
-      collectionsEnabled: false,
-      salesQualifierEnabled: false,
-      surveyEnabled: false
+    });
+
+    // Create initial scenario mapping
+    await setDoc(doc(db, "scenarios", "0"), {
+      clientId: "0",
+      serviceId: "CollectionReminders",
+      scenarioId: "3684649",
+      status: "active"
     });
 
     console.log("Database initialized successfully");
