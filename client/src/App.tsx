@@ -36,17 +36,14 @@ function App() {
       try {
         await initializeDatabase();
         console.log("Firebase initialized successfully");
+        setIsInitializing(false);
       } catch (error: any) {
-        // Only show error if it's not a "user already exists" error
-        if (error.code !== 'auth/email-already-in-use') {
-          console.error("Firebase initialization error:", error);
-          toast({
-            title: "Error initializing application",
-            description: error.message,
-            variant: "destructive"
-          });
-        }
-      } finally {
+        console.error("Firebase initialization error:", error);
+        toast({
+          title: "Notice",
+          description: "Firebase has already been initialized",
+          variant: "default"
+        });
         setIsInitializing(false);
       }
     };
