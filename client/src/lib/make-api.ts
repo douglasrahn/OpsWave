@@ -8,18 +8,21 @@ interface ScenarioStatus {
 
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<boolean> {
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${activate ? 'activate' : 'deactivate'}`;
-  
+
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': MAKE_API_KEY,
-        'Content-Type': 'application/json'
-      }
+        'Authorization': `Token ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      mode: 'cors'
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to ${activate ? 'activate' : 'deactivate'} scenario: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to ${activate ? 'activate' : 'deactivate'} scenario: ${errorText || response.statusText}`);
     }
 
     return true;
@@ -31,17 +34,20 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioStatus> {
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
-  
+
   try {
     const response = await fetch(endpoint, {
       headers: {
-        'Authorization': MAKE_API_KEY,
-        'Content-Type': 'application/json'
-      }
+        'Authorization': `Token ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      mode: 'cors'
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get scenario status: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to get scenario status: ${errorText || response.statusText}`);
     }
 
     const data = await response.json();
