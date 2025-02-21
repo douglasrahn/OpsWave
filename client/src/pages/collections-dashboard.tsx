@@ -21,6 +21,16 @@ interface ScenarioSettings {
   nextExec?: string;
 }
 
+async function getScenarioStatus(scenarioId: string): Promise<{scenario: {status: string, name: string, nextExec: string}}> {
+  // Replace with your actual API call to get scenario status
+  // This is a placeholder, adapt to your actual API
+  const response = await fetch(`/api/scenario/${scenarioId}/status`);
+  if (!response.ok) {
+    throw new Error(`Make.com API request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
 function isValidScenarioId(id: string): boolean {
   return /^\d+$/.test(id);
 }
@@ -55,16 +65,41 @@ export default function CollectionsDashboardPage() {
       }
 
       const scenarioDoc = scenarioSnapshot.docs[0];
-      const data = scenarioDoc.data() as ScenarioSettings;
-      console.log("[Dashboard] Fetched scenario settings:", data);
+      const scenarioData = scenarioDoc.data();
+      console.log("[Dashboard] Fetched scenario data:", scenarioData);
 
-      if (!data.scenarioId || !data.serviceId || !data.clientId) {
-        console.error("[Dashboard] Missing required fields in scenario data:", data);
+      if (!scenarioData.scenarioId || !scenarioData.serviceId || !scenarioData.clientId) {
+        console.error("[Dashboard] Missing required fields in scenario data:", scenarioData);
         throw new Error("Invalid scenario configuration");
       }
 
-      return data;
-    }
+      // Get current status from Make.com API
+      try {
+        const makeStatus = await getScenarioStatus(scenarioData.scenarioId);
+        console.log("[Dashboard] Make.com status:", makeStatus);
+
+        // Update status if it doesn't match
+        if (makeStatus.scenario.status === 'active' && scenarioData.status !== 'active' ||
+            makeStatus.scenario.status !== 'active' && scenarioData.status === 'active') {
+          const newStatus = makeStatus.scenario.status === 'active' ? 'active' : 'inactive';
+          console.log(`[Dashboard] Updating Firebase status to match Make.com: ${newStatus}`);
+          await updateDoc(doc(db, "scenarios", scenarioDoc.id), {
+            status: newStatus
+          });
+          scenarioData.status = newStatus;
+        }
+
+        // Include additional Make.com data
+        scenarioData.name = makeStatus.scenario.name;
+        scenarioData.nextExec = makeStatus.scenario.nextExec;
+      } catch (error) {
+        console.error("[Dashboard] Error fetching Make.com status:", error);
+        // Continue with Firebase data if Make.com API fails
+      }
+
+      return scenarioData as ScenarioSettings;
+    },
+    refetchInterval: 30000 // Refresh every 30 seconds
   });
 
   const handleRefreshStatus = async () => {

@@ -13,23 +13,22 @@ const scenarioResponseSchema = z.object({
     id: z.string(),
     name: z.string(),
     isActive: z.boolean(),
+    status: z.enum(['active', 'inactive', 'error']),
     isPaused: z.boolean().optional(),
     nextExec: z.string().optional(),
+    scheduling: z.object({
+      type: z.string(),
+      interval: z.number().optional(),
+    }).optional(),
   })
 });
 
 type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
 
 /**
- * Makes an authenticated request to the Make.com API
+ * Makes an authenticated request to the Make.com API through our backend proxy
  */
 async function makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-  const apiKey = import.meta.env.VITE_MAKE_API_KEY;
-  if (!apiKey) {
-    console.error("[Make.com API] No API key found in environment variables");
-    throw new Error("Make.com API key not found");
-  }
-
   try {
     console.log(`[Make.com API] Making ${options.method || 'GET'} request to:`, endpoint);
 
@@ -49,7 +48,7 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
     if (!response.ok) {
       const parsedError = errorResponseSchema.safeParse(data);
       const errorMessage = parsedError.success
-        ? parsedError.data.message || parsedError.data.detail
+        ? parsedError.data.message || parsedError.data.detail 
         : `API request failed with status ${response.status}`;
       console.error("[Make.com API] Error response:", data);
       throw new Error(errorMessage);
@@ -58,7 +57,6 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
     return data;
   } catch (error) {
     console.error("[Make.com API] Request failed:", error);
-    // Preserve the original error message
     throw error instanceof Error ? error : new Error('Failed to communicate with Make.com API');
   }
 }
@@ -80,16 +78,26 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioRes
 }
 
 /**
- * Start a scenario
+ * Start a scenario if it's not already running
  */
 export async function startScenario(scenarioId: string): Promise<ScenarioResponse> {
+  const status = await getScenarioStatus(scenarioId);
+  if (status.scenario.status === 'active') {
+    console.log('[Make.com API] Scenario is already active, skipping start request');
+    return status;
+  }
   return makeRequest(`/api/scenarios/${scenarioId}/start`, { method: 'POST' });
 }
 
 /**
- * Stop a scenario
+ * Stop a scenario if it's currently running
  */
 export async function stopScenario(scenarioId: string): Promise<ScenarioResponse> {
+  const status = await getScenarioStatus(scenarioId);
+  if (status.scenario.status !== 'active') {
+    console.log('[Make.com API] Scenario is not active, skipping stop request');
+    return status;
+  }
   return makeRequest(`/api/scenarios/${scenarioId}/stop`, { method: 'POST' });
 }
 
