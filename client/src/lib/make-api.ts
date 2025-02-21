@@ -86,7 +86,7 @@ export async function getScenarioStatus(
 ): Promise<ScenarioResponse> {
   console.log(`[Make.com API] Getting status for scenario ${scenarioId}`);
   const rawData = await makeRequest(
-    `https://us1.make.com/api/v2/scenarios/${scenarioId}`,
+    `/api/scenarios/${scenarioId}`,
   );
 
   // Parse and validate the raw API response
