@@ -2,30 +2,23 @@ import { z } from "zod";
 
 // Success response schema for scenario endpoints based on Make.com API documentation
 const scenarioResponseSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  status: z.enum(["active", "inactive", "draft"]),
-  scheduling: z
-    .object({
+  scenario: z.object({
+    id: z.number(),
+    name: z.string(),
+    isActive: z.boolean(),
+    teamId: z.number(),
+    description: z.string(),
+    lastEdit: z.string(),
+    nextExec: z.string().optional(),
+    created: z.string(),
+    scheduling: z.object({
       type: z.string(),
       interval: z.number().optional(),
-    })
-    .optional(),
-  nextExec: z.string().optional(),
-  description: z.string().optional(),
-  created: z.string().optional(),
-  lastEdit: z.string().optional(),
+    }).optional(),
+  }),
 });
 
-export type ScenarioResponse = {
-  scenario: {
-    id: string;
-    name: string;
-    isActive: boolean;
-    nextExec?: string;
-    description?: string;
-  };
-};
+export type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
 
 /**
  * Makes an authenticated request to the Make.com API through our backend proxy
@@ -93,18 +86,7 @@ export async function getScenarioStatus(
   const validatedData = scenarioResponseSchema.parse(rawData);
   console.log("[Make.com API] Validated data:", validatedData);
 
-  // Transform the validated data into our application's format
-  const transformedData = {
-    scenario: {
-      id: validatedData.id.toString(),
-      name: validatedData.name,
-      isActive: validatedData.status === "active",
-      nextExec: validatedData.nextExec,
-      description: validatedData.description,
-    },
-  };
-  console.log("[Make.com API] Transformed data:", transformedData);
-  return transformedData;
+  return validatedData;
 }
 
 /**
