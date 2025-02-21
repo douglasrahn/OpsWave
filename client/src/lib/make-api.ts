@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const BASE_URL = "https://us1.make.com/api/v2";
-
 // Error response schema from Make.com API
 const errorResponseSchema = z.object({
   detail: z.string().optional(),
@@ -32,32 +30,15 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
     throw new Error("Make.com API key not found");
   }
 
-  const url = `${BASE_URL}${endpoint}`;
-  const headers = new Headers({
-    "Authorization": `Token ${apiKey}`,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-  });
-
   try {
     console.log(`[Make.com API] Making ${options.method || 'GET'} request to:`, endpoint);
 
-    const requestOptions: RequestInit = {
+    const response = await fetch(endpoint, {
       ...options,
-      headers,
-      mode: 'cors',
-      // Don't send credentials for cross-origin requests
-      credentials: 'omit',
-    };
-
-    console.log("[Make.com API] Request options:", {
-      method: requestOptions.method,
-      headers: Object.fromEntries(headers.entries()),
-      mode: requestOptions.mode,
-      credentials: requestOptions.credentials
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
-
-    const response = await fetch(url, requestOptions);
 
     // Log response details for debugging
     console.log("[Make.com API] Response status:", response.status);
@@ -87,7 +68,7 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
  */
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioResponse> {
   try {
-    const data = await makeRequest(`/scenarios/${scenarioId}`);
+    const data = await makeRequest(`/api/scenarios/${scenarioId}`);
     return scenarioResponseSchema.parse(data);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -102,14 +83,14 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioRes
  * Start a scenario
  */
 export async function startScenario(scenarioId: string): Promise<ScenarioResponse> {
-  return makeRequest(`/scenarios/${scenarioId}/start`, { method: 'POST' });
+  return makeRequest(`/api/scenarios/${scenarioId}/start`, { method: 'POST' });
 }
 
 /**
  * Stop a scenario
  */
 export async function stopScenario(scenarioId: string): Promise<ScenarioResponse> {
-  return makeRequest(`/scenarios/${scenarioId}/stop`, { method: 'POST' });
+  return makeRequest(`/api/scenarios/${scenarioId}/stop`, { method: 'POST' });
 }
 
 /**

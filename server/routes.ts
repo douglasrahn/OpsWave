@@ -4,7 +4,7 @@ import express from 'express';
 import fetch from 'node-fetch';
 
 const MAKE_API_KEY = process.env.MAKE_API_KEY;
-const MAKE_API_BASE_URL = 'https://eu1.make.com/api/v2';
+const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
 
 export function registerRoutes(app: Express): Server {
   // Get scenario status
@@ -95,9 +95,9 @@ export function registerRoutes(app: Express): Server {
     try {
       const { scenarioId, action } = req.params;
 
-      if (action !== 'activate' && action !== 'deactivate') {
+      if (action !== 'start' && action !== 'stop') {
         return res.status(400).json({
-          error: 'Invalid action. Must be either "activate" or "deactivate"'
+          error: 'Invalid action. Must be either "start" or "stop"'
         });
       }
 
