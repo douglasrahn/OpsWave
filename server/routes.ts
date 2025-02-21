@@ -6,6 +6,13 @@ import fetch from 'node-fetch';
 const MAKE_API_KEY = process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = 'https://eu1.make.com/api/v2';
 
+interface MakeApiResponse {
+  id: string;
+  name: string;
+  active: boolean;
+  nextExec?: string;
+}
+
 export function registerRoutes(app: Express): Server {
   // Get scenario status
   app.get('/api/scenarios/:scenarioId', async (req, res) => {
@@ -13,7 +20,6 @@ export function registerRoutes(app: Express): Server {
       const { scenarioId } = req.params;
       console.log(`[Make.com API] Getting status for scenario ${scenarioId}`);
 
-      // Log the full request URL and headers
       const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
       const headers = {
         'Authorization': `Token ${MAKE_API_KEY}`,
@@ -30,7 +36,6 @@ export function registerRoutes(app: Express): Server {
         headers
       });
 
-      // Log the raw response for debugging
       const responseText = await response.text();
       console.log('[Make.com API] Raw response:', responseText);
 
@@ -53,8 +58,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Parse the response text as JSON
-      let data;
+      let data: MakeApiResponse;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
@@ -66,7 +70,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Validate and transform the response
-      if (!data || typeof data !== 'object') {
+      if (!data || typeof data !== 'object' || typeof data.active === 'undefined') {
         console.error('[Make.com API] Invalid response structure:', data);
         return res.status(500).json({
           error: 'Invalid response structure from Make.com API'
@@ -74,8 +78,8 @@ export function registerRoutes(app: Express): Server {
       }
 
       const scenarioData = {
-        isActive: data.status === 'active',
-        status: data.status,
+        isActive: data.active,
+        status: data.active ? 'active' : 'inactive',
         name: data.name,
         nextExec: data.nextExec
       };
@@ -103,7 +107,6 @@ export function registerRoutes(app: Express): Server {
 
       console.log(`[Make.com API] ${action.toUpperCase()} scenario ${scenarioId}`);
 
-      // Log the full request URL and headers
       const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`;
       const headers = {
         'Authorization': `Token ${MAKE_API_KEY}`,
@@ -120,7 +123,6 @@ export function registerRoutes(app: Express): Server {
         headers
       });
 
-      // Log the raw response for debugging
       const responseText = await response.text();
       console.log('[Make.com API] Raw response:', responseText);
 
@@ -144,7 +146,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Try to parse the response as JSON if it exists
-      let data = null;
+      let data: MakeApiResponse | null = null;
       if (responseText) {
         try {
           data = JSON.parse(responseText);
@@ -153,9 +155,21 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
+      // Get the updated status to confirm the change
+      const statusUrl = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
+      const statusResponse = await fetch(statusUrl, { headers });
+      const statusData = await statusResponse.json() as MakeApiResponse;
+
+      if (!statusData || typeof statusData.active === 'undefined') {
+        throw new Error('Invalid status response after toggle');
+      }
+
+      const success = action === 'activate' ? statusData.active : !statusData.active;
+
       res.json({
-        success: true,
+        success,
         action,
+        currentStatus: statusData.active ? 'active' : 'inactive',
         response: data
       });
     } catch (error) {
