@@ -35,7 +35,7 @@ export async function toggleScenario(
 ): Promise<boolean> {
   try {
     const action = activate ? 'activate' : 'deactivate';
-    const baseUrl = "https://eu1.make.com/api/v2"; // Using EU1 as per Make.com API docs
+    const baseUrl = "https://us1.make.com/api/v2"; // Using US1 instance
     const url = `${baseUrl}/scenarios/${scenarioId}/${action}`;
 
     console.log(
@@ -85,7 +85,7 @@ export async function getScenarioStatus(
 ): Promise<ScenarioStatus> {
   try {
     console.log("[Make.com API] Getting status for scenario", scenarioId);
-    const baseUrl = "https://eu1.make.com/api/v2";
+    const baseUrl = "https://us1.make.com/api/v2"; // Using US1 instance
     const url = `${baseUrl}/scenarios/${scenarioId}`;
 
     console.log("[Make.com API] Request URL:", url);
