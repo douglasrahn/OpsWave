@@ -145,16 +145,6 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Try to parse the response as JSON if it exists
-      let data: MakeApiResponse | null = null;
-      if (responseText) {
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.warn('[Make.com API] Response not JSON:', responseText);
-        }
-      }
-
       // Get the updated status to confirm the change
       const statusUrl = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
       const statusResponse = await fetch(statusUrl, { headers });
@@ -170,7 +160,7 @@ export function registerRoutes(app: Express): Server {
         success,
         action,
         currentStatus: statusData.active ? 'active' : 'inactive',
-        response: data
+        response: responseText ? JSON.parse(responseText) : null
       });
     } catch (error) {
       console.error('[Make.com API] Request failed:', error);
