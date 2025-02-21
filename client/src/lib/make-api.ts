@@ -90,12 +90,7 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioStatus> {
   try {
-    const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`, {
-      headers: {
-        'Authorization': `Token ${import.meta.env.VITE_MAKE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`);
 
     if (!response.ok) {
       const errorData = await response.json();
