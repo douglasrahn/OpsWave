@@ -15,7 +15,14 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${activate ? 'activate' : 'deactivate'}`;
 
   try {
-    console.log(`Making API call to ${endpoint}`);
+    console.log(`Making API call to ${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -28,16 +35,25 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
     console.log('Make.com API Response:', {
       status: response.status,
       statusText: response.statusText,
-      body: responseText
+      body: responseText || '(empty response)'
     });
 
     if (!response.ok) {
       console.error('Make.com API Error:', {
         status: response.status,
         statusText: response.statusText,
-        responseText
+        responseText: responseText || '(empty response)'
       });
-      throw new Error(`Failed to ${activate ? 'activate' : 'deactivate'} scenario: ${responseText || response.statusText}`);
+
+      let errorMessage = `Failed to ${activate ? 'activate' : 'deactivate'} scenario`;
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMessage = `${errorMessage}: ${errorData.message || errorData.error || response.statusText}`;
+      } catch {
+        errorMessage = `${errorMessage}: ${responseText || response.statusText}`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     return true;
@@ -55,7 +71,14 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
 
   try {
-    console.log(`Checking scenario status at ${endpoint}`);
+    console.log(`Checking scenario status at ${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
@@ -68,29 +91,44 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
     console.log('Make.com API Response:', {
       status: response.status,
       statusText: response.statusText,
-      body: responseText
+      body: responseText || '(empty response)'
     });
 
     if (!response.ok) {
       console.error('Make.com API Error:', {
         status: response.status,
         statusText: response.statusText,
-        responseText
+        responseText: responseText || '(empty response)'
       });
-      throw new Error(`Failed to get scenario status: ${responseText || response.statusText}`);
+
+      let errorMessage = 'Failed to get scenario status';
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMessage = `${errorMessage}: ${errorData.message || errorData.error || response.statusText}`;
+      } catch {
+        errorMessage = `${errorMessage}: ${responseText || response.statusText}`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     let data;
     try {
       data = JSON.parse(responseText);
+      console.log('Parsed scenario data:', data);
     } catch (parseError) {
       console.error('Error parsing response:', parseError);
       throw new Error('Invalid response format from Make.com API');
     }
 
+    if (!data || typeof data.status !== 'string') {
+      console.error('Invalid scenario data format:', data);
+      throw new Error('Invalid scenario data format received from Make.com API');
+    }
+
     return {
       status: data.status,
-      message: data.statusMessage
+      message: data.statusMessage || data.message
     };
   } catch (error) {
     console.error('Error getting scenario status:', error);
