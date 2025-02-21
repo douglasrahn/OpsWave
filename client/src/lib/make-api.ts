@@ -34,7 +34,12 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
     // First get the current status to verify the intended action
     const currentStatus = await getScenarioStatus(scenarioId);
 
-    // Only proceed if the current status matches our intent to change
+    // Check if the scenario is in a valid state for toggling
+    if (currentStatus.status === 'error') {
+      throw new Error('Cannot toggle scenario: Current status is invalid');
+    }
+
+    // Only proceed if the current status actually needs to change
     if (currentStatus.isActive === activate) {
       console.log(`Scenario is already ${activate ? 'active' : 'inactive'}`);
       return true;
@@ -45,21 +50,30 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 
     try {
       const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
-      const data: MakeApiResponse = await response.json();
 
-      // Log the parsed response for debugging
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to ${action} scenario: ${errorData.message || 'Unknown error'}`);
+      }
+
+      const data: MakeApiResponse = await response.json();
       console.log('Toggle scenario response:', data);
 
-      // Verify the toggle was successful
+      // Verify the toggle was successful by checking the updated status
       const updatedStatus = await getScenarioStatus(scenarioId);
+
+      // Ensure the status matches our intended state
       if (updatedStatus.isActive !== activate) {
         throw new Error(`Failed to ${action} scenario. Status remains ${updatedStatus.status}`);
       }
 
       return true;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('not found')) {
-        throw new Error(`Scenario ${scenarioId} not found. Please verify your scenario ID.`);
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          throw new Error(`Scenario ${scenarioId} not found. Please verify your scenario ID.`);
+        }
+        throw new Error(`Failed to ${action} scenario: ${error.message}`);
       }
       throw error;
     }
