@@ -4,10 +4,12 @@ import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
 import { PhoneCall, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { db, auth } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
 import { toggleScenario, getScenarioStatus } from "@/lib/make-api";
+import { getCurrentClientId } from "@/lib/auth";
+import { useLocation } from "wouter";
 
 interface ScenarioSettings {
   clientId: string;
@@ -20,6 +22,7 @@ export default function CollectionsDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [scenarioStatus, setScenarioStatus] = useState<string>("");
   const { toast } = useToast();
+  const [_, setLocation] = useLocation();
 
   // Query scenario settings
   const { data: scenarioSettings, refetch, isError, error } = useQuery<ScenarioSettings>({
@@ -27,23 +30,12 @@ export default function CollectionsDashboardPage() {
     queryFn: async () => {
       console.log("Fetching scenario settings...");
 
-      // Get current user's email
-      const currentUser = auth.currentUser;
-      if (!currentUser?.email) {
-        throw new Error("No authenticated user found");
+      const clientId = getCurrentClientId();
+      if (!clientId) {
+        console.error("No client ID found in session");
+        setLocation("/login"); // Redirect to login if no client ID
+        throw new Error("Please log in again");
       }
-
-      // Get client document using user's email
-      const clientsRef = collection(db, "clients");
-      const clientQuery = query(clientsRef, where("username", "==", currentUser.email));
-      const clientSnapshot = await getDocs(clientQuery);
-
-      if (clientSnapshot.empty) {
-        throw new Error("No client found for current user");
-      }
-
-      const clientDoc = clientSnapshot.docs[0];
-      const clientId = clientDoc.id;
 
       // Get scenario document using client ID
       const scenarioQuery = query(

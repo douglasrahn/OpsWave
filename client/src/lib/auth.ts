@@ -1,6 +1,13 @@
 import { auth, db } from "./firebase";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+
+// Create a context to store client information
+let currentClientId: string | null = null;
+
+export function getCurrentClientId(): string | null {
+  return currentClientId;
+}
 
 export async function loginUser(email: string, password: string) {
   try {
@@ -12,20 +19,36 @@ export async function loginUser(email: string, password: string) {
       )
     ]);
 
-    // Then fetch user data
+    // Then fetch client data
     try {
+      // Query clients collection to get client ID for this user
+      const clientsQuery = query(
+        collection(db, "clients"),
+        where("username", "==", email)
+      );
+      const clientSnapshot = await getDocs(clientsQuery);
+
+      if (clientSnapshot.empty) {
+        throw new Error("No client found for this user");
+      }
+
+      const clientDoc = clientSnapshot.docs[0];
+      currentClientId = clientDoc.id;
+
+      // Get user data from users collection
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+
       if (!userDoc.exists()) {
         throw new Error("User data not found");
       }
-      return userDoc.data();
+
+      return {
+        ...userDoc.data(),
+        clientId: currentClientId
+      };
     } catch (firestoreError) {
       console.error("Firestore error:", firestoreError);
-      // If we can't get Firestore data, still allow login but return basic user info
-      return {
-        email: userCredential.user.email,
-        uid: userCredential.user.uid
-      };
+      throw new Error("Failed to fetch user data. Please try again.");
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -69,6 +92,7 @@ export async function createUser(email: string, password: string, accessLevel: s
 export async function logoutUser() {
   try {
     await signOut(auth);
+    currentClientId = null; // Clear the stored client ID
   } catch (error: unknown) {
     if (error instanceof Error) {
       throw new Error(error.message);
