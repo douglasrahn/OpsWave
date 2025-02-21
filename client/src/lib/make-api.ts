@@ -51,14 +51,14 @@ export async function toggleScenario(
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData: MakeApiError = await response.json();
       console.log("[Make.com API] Error response:", {
         status: response.status,
         statusText: response.statusText,
-        body: await response.text(),
+        errorData,
       });
       throw new Error(
-        `Failed to ${action} scenario: ${errorData.message || "Unknown error"}`,
+        errorData.message || errorData.detail || `Failed to ${action} scenario`
       );
     }
 
@@ -68,15 +68,10 @@ export async function toggleScenario(
     return true;
   } catch (error) {
     console.error("[Make.com API] Error during toggle request:", error);
-    if (error instanceof Error) {
-      if (error.message.includes("not found")) {
-        throw new Error(
-          `Scenario ${scenarioId} not found. Please verify your scenario ID.`,
-        );
-      }
-      throw new Error(`Failed to toggle scenario: ${error.message}`);
-    }
-    throw error;
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Failed to communicate with Make.com API";
+    throw new Error(errorMessage);
   }
 }
 
@@ -98,13 +93,13 @@ export async function getScenarioStatus(
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData: MakeApiError = await response.json();
       console.log("[Make.com API] Error response:", {
         status: response.status,
         statusText: response.statusText,
-        body: await response.text(),
+        errorData,
       });
-      throw new Error(errorData.message || "Failed to get scenario status");
+      throw new Error(errorData.message || errorData.detail || "Failed to get scenario status");
     }
 
     const data: MakeApiResponse = await response.json();
@@ -129,11 +124,9 @@ export async function getScenarioStatus(
     return status;
   } catch (error) {
     console.error("[Make.com API] Error getting scenario status:", error);
-    if (error instanceof Error && error.message.includes("not found")) {
-      throw new Error(
-        `Scenario ${scenarioId} not found. Please verify your scenario ID.`,
-      );
-    }
-    throw error;
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Failed to communicate with Make.com API";
+    throw new Error(errorMessage);
   }
 }
