@@ -1,142 +1,108 @@
 import { z } from "zod";
 
-interface ScenarioStatus {
-  status: string;
-  message?: string;
-  isActive: boolean;
-  name: string;
-  nextExec?: string;
-}
+const BASE_URL = "https://us1.make.com/api/v2";
 
-interface MakeApiError {
-  detail: string;
-  message: string;
-  code: string;
-  suberrors?: any[];
-}
+// Error response schema from Make.com API
+const errorResponseSchema = z.object({
+  detail: z.string().optional(),
+  message: z.string().optional(),
+  code: z.string().optional(),
+});
 
-interface MakeApiResponse {
-  scenario: {
-    id: string;
-    name: string;
-    isActive: boolean;
-    isPaused: boolean;
-    nextExec?: string;
-    scheduling?: {
-      type: string;
-      interval: number;
-    };
-  };
-}
+// Success response schema for scenario endpoints
+const scenarioResponseSchema = z.object({
+  scenario: z.object({
+    id: z.string(),
+    name: z.string(),
+    isActive: z.boolean(),
+    isPaused: z.boolean().optional(),
+    nextExec: z.string().optional(),
+  })
+});
 
-// Separate function for Make.com API requests to handle CORS properly
-async function makeFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const makeApiKey = import.meta.env.VITE_MAKE_API_KEY;
-  if (!makeApiKey) {
-    throw new Error("Make.com API key not found in environment variables");
+type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
+
+/**
+ * Makes an authenticated request to the Make.com API
+ */
+async function makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+  const apiKey = import.meta.env.VITE_MAKE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Make.com API key not found");
   }
 
+  const url = `${BASE_URL}${endpoint}`;
+  const headers = {
+    "Authorization": `Token ${apiKey}`,
+    "Content-Type": "application/json",
+  };
+
   try {
+    console.log(`[Make.com API] Making ${options.method || 'GET'} request to:`, endpoint);
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        "Authorization": `Token ${makeApiKey}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-      // Don't include credentials for cross-origin requests
+      headers,
       credentials: 'omit',
       mode: 'cors',
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      let errorMessage: string;
-      try {
-        const errorData: MakeApiError = await response.json();
-        errorMessage = errorData.message || errorData.detail || "Make.com API request failed";
-      } catch (parseError) {
-        errorMessage = `Make.com API request failed with status ${response.status}: ${response.statusText}`;
-      }
-      throw new Error(errorMessage);
+      // Parse error response
+      const error = errorResponseSchema.parse(data);
+      throw new Error(error.message || error.detail || `API request failed with status ${response.status}`);
     }
 
-    return response;
+    return data;
   } catch (error) {
-    console.error("[Make.com API] Request failed:", error);
+    console.error('[Make.com API] Request failed:', error);
+    throw error instanceof Error ? error : new Error('Failed to communicate with Make.com API');
+  }
+}
+
+/**
+ * Get the current status of a scenario
+ */
+export async function getScenarioStatus(scenarioId: string): Promise<ScenarioResponse> {
+  try {
+    const data = await makeRequest(`/scenarios/${scenarioId}`);
+    return scenarioResponseSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('[Make.com API] Invalid response format:', error.errors);
+      throw new Error('Invalid response format from Make.com API');
+    }
     throw error;
   }
 }
 
-export async function toggleScenario(
-  scenarioId: string,
-  activate: boolean,
-): Promise<boolean> {
-  try {
-    const action = activate ? 'start' : 'stop';
-    const baseUrl = "https://us1.make.com/api/v2"; // Using US1 instance
-    const url = `${baseUrl}/scenarios/${scenarioId}/${action}`;
-
-    console.log(
-      `[Make.com API] Sending ${action} request for scenario ${scenarioId}`,
-      '\nRequest URL:', url,
-    );
-
-    const response = await makeFetch(url, {
-      method: "POST",
-    });
-
-    const data: MakeApiResponse = await response.json();
-    console.log('[Make.com API] Toggle response:', data);
-
-    return true;
-  } catch (error) {
-    console.error("[Make.com API] Error during toggle request:", error);
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : "Failed to communicate with Make.com API";
-    throw new Error(errorMessage);
-  }
+/**
+ * Start a scenario
+ */
+export async function startScenario(scenarioId: string): Promise<ScenarioResponse> {
+  return makeRequest(`/scenarios/${scenarioId}/start`, { method: 'POST' });
 }
 
-export async function getScenarioStatus(
-  scenarioId: string,
-): Promise<ScenarioStatus> {
+/**
+ * Stop a scenario
+ */
+export async function stopScenario(scenarioId: string): Promise<ScenarioResponse> {
+  return makeRequest(`/scenarios/${scenarioId}/stop`, { method: 'POST' });
+}
+
+export async function toggleScenario(scenarioId: string, activate: boolean): Promise<ScenarioResponse> {
+  console.log(`[Make.com API] Toggling scenario ${scenarioId} to ${activate ? 'active' : 'inactive'}`);
   try {
-    console.log("[Make.com API] Getting status for scenario", scenarioId);
-    const baseUrl = "https://us1.make.com/api/v2"; // Using US1 instance
-    const url = `${baseUrl}/scenarios/${scenarioId}`;
+    const response = activate ? 
+      await startScenario(scenarioId) : 
+      await stopScenario(scenarioId);
 
-    console.log("[Make.com API] Request URL:", url);
-
-    const response = await makeFetch(url, {
-      method: "GET",
-    });
-
-    const data: MakeApiResponse = await response.json();
-    console.log("[Make.com API] Raw response:", data);
-
-    if (!data?.scenario) {
-      console.error("[Make.com API] Invalid scenario data format:", data);
-      throw new Error(
-        "Invalid scenario data format received from Make.com API",
-      );
-    }
-
-    const status: ScenarioStatus = {
-      status: data.scenario.isActive ? "active" : "inactive",
-      isActive: data.scenario.isActive,
-      name: data.scenario.name,
-      nextExec: data.scenario.nextExec,
-      message: data.scenario.isPaused ? "Scenario is paused" : undefined,
-    };
-
-    console.log("[Make.com API] Parsed status:", status);
-    return status;
+    console.log(`[Make.com API] Successfully ${activate ? 'started' : 'stopped'} scenario:`, response);
+    return response;
   } catch (error) {
-    console.error("[Make.com API] Error getting scenario status:", error);
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : "Failed to communicate with Make.com API";
-    throw new Error(errorMessage);
+    console.error(`[Make.com API] Failed to ${activate ? 'start' : 'stop'} scenario:`, error);
+    throw error;
   }
 }
