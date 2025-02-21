@@ -21,19 +21,23 @@ export async function loginUser(email: string, password: string) {
 
     // Then fetch client data
     try {
-      // Query clients collection to get client ID for this user
+      console.log("Looking up client for email:", email);
+
+      // Query clients collection to get client ID for this user's email
       const clientsQuery = query(
         collection(db, "clients"),
-        where("username", "==", email)
+        where("email", "==", email)
       );
       const clientSnapshot = await getDocs(clientsQuery);
 
       if (clientSnapshot.empty) {
+        console.log("No client found for email:", email);
         throw new Error("No client found for this user");
       }
 
       const clientDoc = clientSnapshot.docs[0];
       currentClientId = clientDoc.id;
+      console.log("Found client ID:", currentClientId);
 
       // Get user data from users collection
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
