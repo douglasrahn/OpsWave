@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, collection, enableIndexedDbPersistence, getDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -52,8 +51,7 @@ async function initializeScenarioData() {
       await setDoc(scenarioRef, {
         clientId: "0",
         serviceId: "CollectionReminders",
-        scenarioId: "3684649",
-        status: "active"
+        scenarioId: "3684649"
       });
       console.log("Scenario document created successfully");
     } else {
@@ -62,8 +60,7 @@ async function initializeScenarioData() {
       await setDoc(scenarioRef, {
         clientId: "0",
         serviceId: "CollectionReminders",
-        scenarioId: "3684649",
-        status: "active"
+        scenarioId: "3684649"
       }, { merge: true });
       console.log("Scenario document updated successfully");
     }
@@ -77,50 +74,10 @@ async function initializeScenarioData() {
 export async function initializeDatabase() {
   try {
     console.log("Starting database initialization...");
-
-    // Create master admin user
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      "drahn@blueisland.ai",
-      "Welcome1"
-    );
-
-    // Store user data in Firestore with UID
-    await setDoc(doc(db, "users", userCredential.user.uid), {
-      email: "drahn@blueisland.ai",
-      uid: userCredential.user.uid,  // Store the Firebase UID
-      accessLevel: "MasterAdmin",
-      clientId: "0"
-    });
-
-    // Create initial client
-    await setDoc(doc(db, "clients", "0"), {
-      companyName: "BlueIsland",
-      url: "blueisland.ai",
-      email: "drahn@blueisland.ai"  // Add email field here
-    });
-
     await initializeScenarioData();
     console.log("Database initialized successfully");
   } catch (error) {
     console.error("Error initializing database:", error);
-    if (error instanceof Error && error.message.includes('auth/email-already-in-use')) {
-      console.log("User already exists, ensuring client data is initialized...");
-      try {
-        // Update client data to ensure email field exists
-        await setDoc(doc(db, "clients", "0"), {
-          companyName: "BlueIsland",
-          url: "blueisland.ai",
-          email: "drahn@blueisland.ai"
-        }, { merge: true });
-        await initializeScenarioData();
-        console.log("Data initialized/updated successfully");
-      } catch (updateError) {
-        console.error("Error updating data:", updateError);
-        throw updateError;
-      }
-      return;
-    }
     throw error;
   }
 }

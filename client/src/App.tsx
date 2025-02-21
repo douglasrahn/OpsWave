@@ -38,11 +38,11 @@ function App() {
         console.log("Firebase initialized successfully");
         setIsInitializing(false);
       } catch (error: any) {
-        console.error("Firebase initialization error:", error);
+        console.error("Error initializing Firebase:", error);
         toast({
-          title: "Notice",
-          description: "Firebase has already been initialized",
-          variant: "default"
+          title: "Error",
+          description: "Failed to initialize application. Please refresh the page.",
+          variant: "destructive"
         });
         setIsInitializing(false);
       }
