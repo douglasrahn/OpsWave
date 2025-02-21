@@ -31,7 +31,6 @@ export default function CollectionsDashboardPage() {
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
 
-  // Query scenario settings
   const { data: scenarioSettings, refetch, isError, error } = useQuery<ScenarioSettings>({
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
@@ -117,7 +116,7 @@ export default function CollectionsDashboardPage() {
       console.log('[Dashboard] Toggle scenario result:', success);
 
       if (success) {
-        // Update status in Firebase
+        // Update Firebase status
         const scenarioQuery = query(
           collection(db, "scenarios"),
           where("clientId", "==", scenarioSettings.clientId),
@@ -133,8 +132,6 @@ export default function CollectionsDashboardPage() {
             status: newStatus
           });
         }
-
-        // Update UI with the new toggle state
 
         toast({
           title: checked ? "Service Resumed" : "Service Paused",
