@@ -4,16 +4,45 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 
 export async function loginUser(email: string, password: string) {
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
-    if (!userDoc.exists()) {
-      throw new Error("User data not found");
+    // First attempt authentication
+    const userCredential = await Promise.race([
+      signInWithEmailAndPassword(auth, email, password),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Login timed out. Please try again.")), 10000)
+      )
+    ]);
+
+    // Then fetch user data
+    try {
+      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+      if (!userDoc.exists()) {
+        throw new Error("User data not found");
+      }
+      return userDoc.data();
+    } catch (firestoreError) {
+      console.error("Firestore error:", firestoreError);
+      // If we can't get Firestore data, still allow login but return basic user info
+      return {
+        email: userCredential.user.email,
+        uid: userCredential.user.uid
+      };
     }
-    return userDoc.data();
   } catch (error: unknown) {
     if (error instanceof Error) {
+      if (error.message.includes("timeout")) {
+        throw new Error("Login timed out. Please try again.");
+      }
+      if (error.message.includes("wrong-password")) {
+        throw new Error("Incorrect password.");
+      }
+      if (error.message.includes("user-not-found")) {
+        throw new Error("No account found with this email.");
+      }
+      if (error.message.includes("too-many-requests")) {
+        throw new Error("Too many attempts. Please try again later.");
+      }
       if (error.message.includes("offline")) {
-        throw new Error("Unable to connect to the server. Please check your internet connection.");
+        throw new Error("Unable to connect. Please check your internet connection.");
       }
       throw new Error(error.message);
     }

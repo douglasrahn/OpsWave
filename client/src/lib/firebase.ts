@@ -19,6 +19,8 @@ for (const config of requiredConfigs) {
   }
 }
 
+console.log("Initializing Firebase with project:", firebaseConfig.projectId);
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -41,6 +43,8 @@ enableIndexedDbPersistence(db)
 // Initialize the database with required data
 export async function initializeDatabase() {
   try {
+    console.log("Starting database initialization...");
+
     // Create master admin user
     const userCredential = await createUserWithEmailAndPassword(
       auth,
@@ -48,12 +52,16 @@ export async function initializeDatabase() {
       "Welcome1"
     );
 
+    console.log("Created master admin user");
+
     // Store user data in Firestore
     await setDoc(doc(db, "users", userCredential.user.uid), {
       email: "drahn@blueisland.ai",
       accessLevel: "MasterAdmin",
       clientId: "0"
     });
+
+    console.log("Stored master admin user data");
 
     // Create initial client
     await setDoc(doc(db, "clients", "0"), {
