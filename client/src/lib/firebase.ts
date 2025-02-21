@@ -14,7 +14,7 @@ const firebaseConfig = {
 // Verify that all required configuration values are present
 const requiredConfigs = ['apiKey', 'authDomain', 'projectId', 'appId'];
 for (const config of requiredConfigs) {
-  if (!firebaseConfig[config]) {
+  if (!firebaseConfig[config as keyof typeof firebaseConfig]) {
     throw new Error(`Missing required Firebase configuration: ${config}`);
   }
 }
@@ -63,19 +63,22 @@ export async function initializeDatabase() {
 
     console.log("Stored master admin user data");
 
-    // Create initial client
+    // Create initial client with scenario IDs
     await setDoc(doc(db, "clients", "0"), {
       companyName: "BlueIsland",
       url: "blueisland.ai",
-      collections: true,
-      salesQualifier: false,
-      survey: false
+      collectionsScenarioId: "",
+      salesQualifierScenarioId: "",
+      surveyScenarioId: "",
+      collectionsEnabled: false,
+      salesQualifierEnabled: false,
+      surveyEnabled: false
     });
 
     console.log("Database initialized successfully");
   } catch (error) {
     console.error("Error initializing database:", error);
-    if (error.code === 'auth/email-already-in-use') {
+    if (error instanceof Error && error.message.includes('auth/email-already-in-use')) {
       console.log("Initial user already exists, skipping initialization");
       return;
     }
