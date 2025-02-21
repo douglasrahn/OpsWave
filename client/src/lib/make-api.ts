@@ -1,6 +1,4 @@
-// Get Make.com API key from environment variables
-const MAKE_API_KEY = import.meta.env.VITE_MAKE_API_KEY;
-const MAKE_API_BASE_URL = "https://us1.make.com/api/v2";
+import { apiRequest } from "./queryClient";
 
 interface ScenarioStatus {
   status: string;
@@ -32,62 +30,10 @@ interface MakeApiResponse {
 }
 
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<boolean> {
-  if (!MAKE_API_KEY) {
-    throw new Error("Make.com API key is not configured");
-  }
-
-  const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${activate ? 'activate' : 'deactivate'}`;
-
   try {
-    console.log(`Making API call to ${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${MAKE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${MAKE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors',
-      credentials: 'omit'
-    });
-
-    const responseText = await response.text();
-    console.log('Make.com API Response:', {
-      status: response.status,
-      statusText: response.statusText,
-      body: responseText || '(empty response)'
-    });
-
-    if (!response.ok) {
-      console.error('Make.com API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        responseText: responseText || '(empty response)'
-      });
-
-      let errorMessage = `Failed to ${activate ? 'activate' : 'deactivate'} scenario`;
-      try {
-        const errorData = JSON.parse(responseText) as MakeApiError;
-        if (errorData.code === 'SC401') {
-          throw new Error('Invalid or expired API token. Please check your Make.com API token configuration.');
-        }
-        errorMessage = `${errorMessage}: ${errorData.message || errorData.detail || response.statusText}`;
-        if (errorData.suberrors?.length) {
-          console.error('Detailed errors:', errorData.suberrors);
-        }
-      } catch (parseError) {
-        errorMessage = `${errorMessage}: ${responseText || response.statusText}`;
-      }
-
-      throw new Error(errorMessage);
-    }
-
+    const action = activate ? 'activate' : 'deactivate';
+    const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
+    const data = await response.json();
     return true;
   } catch (error) {
     console.error('Error toggling scenario:', error);
@@ -96,70 +42,9 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 }
 
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioStatus> {
-  if (!MAKE_API_KEY) {
-    throw new Error("Make.com API key is not configured");
-  }
-
-  const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
-
   try {
-    console.log(`Checking scenario status at ${endpoint}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token ${MAKE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token ${MAKE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors',
-      credentials: 'omit'
-    });
-
-    const responseText = await response.text();
-    console.log('Make.com API Response:', {
-      status: response.status,
-      statusText: response.statusText,
-      body: responseText || '(empty response)'
-    });
-
-    if (!response.ok) {
-      console.error('Make.com API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        responseText: responseText || '(empty response)'
-      });
-
-      let errorMessage = 'Failed to get scenario status';
-      try {
-        const errorData = JSON.parse(responseText) as MakeApiError;
-        if (errorData.code === 'SC401') {
-          throw new Error('Invalid or expired API token. Please check your Make.com API token configuration.');
-        }
-        errorMessage = `${errorMessage}: ${errorData.message || errorData.detail || response.statusText}`;
-        if (errorData.suberrors?.length) {
-          console.error('Detailed errors:', errorData.suberrors);
-        }
-      } catch (parseError) {
-        errorMessage = `${errorMessage}: ${responseText || response.statusText}`;
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    let data: MakeApiResponse;
-    try {
-      data = JSON.parse(responseText);
-      console.log('Parsed scenario data:', data);
-    } catch (parseError) {
-      console.error('Error parsing response:', parseError);
-      throw new Error('Invalid response format from Make.com API');
-    }
+    const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`);
+    const data: MakeApiResponse = await response.json();
 
     if (!data?.scenario) {
       console.error('Invalid scenario data format:', data);
