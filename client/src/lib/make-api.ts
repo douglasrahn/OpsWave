@@ -36,29 +36,35 @@ async function makeFetch(url: string, options: RequestInit = {}): Promise<Respon
     throw new Error("Make.com API key not found in environment variables");
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Authorization": `Token ${makeApiKey}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    // Don't include credentials for cross-origin requests
-    credentials: 'omit',
-    mode: 'cors',
-  });
-
-  if (!response.ok) {
-    const errorData: MakeApiError = await response.json();
-    console.error("[Make.com API] Error response:", {
-      status: response.status,
-      statusText: response.statusText,
-      errorData,
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Authorization": `Token ${makeApiKey}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      // Don't include credentials for cross-origin requests
+      credentials: 'omit',
+      mode: 'cors',
     });
-    throw new Error(errorData.message || errorData.detail || "Make.com API request failed");
-  }
 
-  return response;
+    if (!response.ok) {
+      let errorMessage: string;
+      try {
+        const errorData: MakeApiError = await response.json();
+        errorMessage = errorData.message || errorData.detail || "Make.com API request failed";
+      } catch (parseError) {
+        errorMessage = `Make.com API request failed with status ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response;
+  } catch (error) {
+    console.error("[Make.com API] Request failed:", error);
+    throw error;
+  }
 }
 
 export async function toggleScenario(
