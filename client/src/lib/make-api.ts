@@ -66,6 +66,12 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
       const data: MakeApiResponse = await response.json();
       console.log('[Make.com API] Toggle response:', data);
 
+      // Add delay before checking status if we're deactivating
+      if (!activate) {
+        console.log('[Make.com API] Waiting 5 seconds before checking deactivated status...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+
       // Verify the toggle was successful by checking the updated status
       const updatedStatus = await getScenarioStatus(scenarioId);
       console.log('[Make.com API] Status after toggle:', updatedStatus);
