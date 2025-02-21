@@ -27,37 +27,9 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Transform the Make.com response to match our frontend schema
-      const transformedData = {
-        scenario: {
-          id: data.id,
-          name: data.name,
-          teamId: data.teamId,
-          isActive: data.status === 'active',
-          isPaused: data.status === 'suspended',
-          hookId: data.hookId,
-          deviceId: data.deviceId,
-          deviceScope: data.deviceScope,
-          concept: data.concept,
-          description: data.description || '',
-          folderId: data.folderId,
-          slots: data.slots,
-          isinvalid: data.isinvalid || false,
-          islinked: data.islinked || false,
-          islocked: data.islocked || false,
-          usedPackages: data.usedPackages || [],
-          lastEdit: data.lastEdit,
-          scheduling: data.scheduling || { type: 'manual' },
-          iswaiting: data.iswaiting || false,
-          dlqCount: data.dlqCount || 0,
-          allDlqCount: data.allDlqCount || 0,
-          nextExec: data.nextExec,
-          created: data.created,
-          chainingRole: data.chainingRole || 'none'
-        }
-      };
-
-      res.json(transformedData);
+      // Return the raw Make.com API response
+      // The client will handle the transformation
+      res.json(data);
     } catch (error) {
       console.error('[Make.com API] Request failed:', error);
       res.status(500).json({
@@ -100,36 +72,8 @@ export function registerRoutes(app: Express): Server {
       const statusResponse = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, { headers });
       const statusData = await statusResponse.json();
 
-      const transformedData = {
-        scenario: {
-          id: statusData.id,
-          name: statusData.name,
-          teamId: statusData.teamId,
-          isActive: statusData.status === 'active',
-          isPaused: statusData.status === 'suspended',
-          hookId: statusData.hookId,
-          deviceId: statusData.deviceId,
-          deviceScope: statusData.deviceScope,
-          concept: statusData.concept,
-          description: statusData.description || '',
-          folderId: statusData.folderId,
-          slots: statusData.slots,
-          isinvalid: statusData.isinvalid || false,
-          islinked: statusData.islinked || false,
-          islocked: statusData.islocked || false,
-          usedPackages: statusData.usedPackages || [],
-          lastEdit: statusData.lastEdit,
-          scheduling: statusData.scheduling || { type: 'manual' },
-          iswaiting: statusData.iswaiting || false,
-          dlqCount: statusData.dlqCount || 0,
-          allDlqCount: statusData.allDlqCount || 0,
-          nextExec: statusData.nextExec,
-          created: statusData.created,
-          chainingRole: statusData.chainingRole || 'none'
-        }
-      };
-
-      res.json(transformedData);
+      // Return the raw Make.com API response
+      res.json(statusData);
     } catch (error) {
       console.error('[Make.com API] Request failed:', error);
       res.status(500).json({
