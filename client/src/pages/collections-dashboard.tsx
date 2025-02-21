@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
-import { PhoneCall, Clock } from "lucide-react";
+import { PhoneCall, Clock, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
@@ -21,6 +21,7 @@ interface ScenarioSettings {
 export default function CollectionsDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [scenarioStatus, setScenarioStatus] = useState<string>("");
+  const [isStatusLoading, setIsStatusLoading] = useState(true);
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
 
@@ -62,6 +63,50 @@ export default function CollectionsDashboardPage() {
       return data;
     }
   });
+
+  // Fetch initial scenario status from Make.com
+  useEffect(() => {
+    async function fetchScenarioStatus() {
+      if (!scenarioSettings?.scenarioId) return;
+
+      setIsStatusLoading(true);
+      try {
+        const status = await getScenarioStatus(scenarioSettings.scenarioId);
+        console.log("Initial scenario status from Make.com:", status);
+
+        // Update the status in Firebase to match Make.com
+        const scenarioQuery = query(
+          collection(db, "scenarios"),
+          where("clientId", "==", scenarioSettings.clientId),
+          where("serviceId", "==", "CollectionReminders")
+        );
+        const scenarioSnapshot = await getDocs(scenarioQuery);
+
+        if (!scenarioSnapshot.empty) {
+          await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
+            status: status.status
+          });
+        }
+
+        setScenarioStatus(status.status);
+        await refetch(); // Refresh the data to get updated status
+      } catch (error) {
+        console.error("Error fetching initial scenario status:", error);
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : "Failed to fetch scenario status from Make.com";
+        toast({
+          title: "Warning",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      } finally {
+        setIsStatusLoading(false);
+      }
+    }
+
+    fetchScenarioStatus();
+  }, [scenarioSettings?.scenarioId, toast, refetch]);
 
   // Display error toast if query fails
   useEffect(() => {
@@ -153,11 +198,6 @@ export default function CollectionsDashboardPage() {
     }
   };
 
-  // Log initial scenario settings when component mounts
-  useEffect(() => {
-    console.log("Initial scenario settings:", scenarioSettings);
-  }, [scenarioSettings]);
-
   if (isError) {
     return (
       <DashboardLayout>
@@ -217,15 +257,26 @@ export default function CollectionsDashboardPage() {
           <div className="flex flex-col items-center space-y-4">
             <h2 className="text-xl font-semibold">AI Calling Agent</h2>
             <div className="flex items-center space-x-4">
-              <span className={`text-sm ${scenarioSettings?.status !== 'active' ? "text-muted-foreground" : ""}`}>
-                {scenarioSettings?.status === 'active' ? "ACTIVE" : "PAUSED"}
-              </span>
-              <Switch
-                checked={scenarioSettings?.status === 'active'}
-                onCheckedChange={handleToggleService}
-                className="scale-125"
-                disabled={isLoading}
-              />
+              {isStatusLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">
+                    Checking status...
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={`text-sm ${scenarioSettings?.status !== 'active' ? "text-muted-foreground" : ""}`}>
+                    {scenarioSettings?.status === 'active' ? "ACTIVE" : "PAUSED"}
+                  </span>
+                  <Switch
+                    checked={scenarioSettings?.status === 'active'}
+                    onCheckedChange={handleToggleService}
+                    className="scale-125"
+                    disabled={isLoading || isStatusLoading}
+                  />
+                </>
+              )}
             </div>
             <p className="text-sm text-muted-foreground text-center max-w-md">
               Toggle this switch to pause or resume the AI calling agent. 
