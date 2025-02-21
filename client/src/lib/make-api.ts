@@ -10,21 +10,33 @@ const errorResponseSchema = z.object({
 // Success response schema for scenario endpoints
 const scenarioResponseSchema = z.object({
   scenario: z.object({
-    id: z.string().or(z.number()).transform(String),
+    id: z.number().or(z.string()).transform(String),
     name: z.string(),
-    teamId: z.string().or(z.number()).transform(String),
+    teamId: z.number().or(z.string()).transform(String),
     isActive: z.boolean(),
-    isPaused: z.boolean(),
-    nextExec: z.string().optional(),
+    isPaused: z.boolean().optional(),
+    hookId: z.string().nullable(),
+    deviceId: z.string().nullable(),
+    deviceScope: z.string().nullable(),
+    concept: z.boolean(),
+    description: z.string(),
+    folderId: z.string().nullable(),
+    slots: z.any().nullable(),
+    isinvalid: z.boolean(),
+    islinked: z.boolean(),
+    islocked: z.boolean(),
+    usedPackages: z.array(z.string()),
+    lastEdit: z.string(),
     scheduling: z.object({
       type: z.string(),
       interval: z.number().optional(),
     }).optional(),
-    // Add other fields as optional since we don't use them
-    description: z.string().optional(),
-    lastEdit: z.string().optional(),
-    created: z.string().optional(),
-    usedPackages: z.array(z.string()).optional(),
+    iswaiting: z.boolean(),
+    dlqCount: z.number(),
+    allDlqCount: z.number(),
+    nextExec: z.string().optional(),
+    created: z.string(),
+    chainingRole: z.string(),
   })
 });
 
@@ -70,16 +82,8 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
  * Get the current status of a scenario
  */
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioResponse> {
-  try {
-    const data = await makeRequest(`/api/scenarios/${scenarioId}`);
-    return scenarioResponseSchema.parse(data);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error('[Make.com API] Invalid response format:', error.errors);
-      throw new Error('Invalid response format from Make.com API');
-    }
-    throw error;
-  }
+  const data = await makeRequest(`/api/scenarios/${scenarioId}`);
+  return scenarioResponseSchema.parse(data);
 }
 
 /**
