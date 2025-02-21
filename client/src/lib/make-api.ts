@@ -33,42 +33,42 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
   }
 
   const url = `${BASE_URL}${endpoint}`;
-  const headers = {
+  const headers = new Headers({
     "Authorization": `Token ${apiKey}`,
     "Content-Type": "application/json",
-  };
+    "Accept": "application/json",
+  });
 
   try {
     console.log(`[Make.com API] Making ${options.method || 'GET'} request to:`, endpoint);
-    console.log("[Make.com API] Request headers:", headers);
 
-    const response = await fetch(url, {
+    const requestOptions: RequestInit = {
       ...options,
       headers,
-      credentials: 'omit',
       mode: 'cors',
-    }).catch(error => {
-      console.error("[Make.com API] Fetch failed:", error);
-      throw new Error(`Network request failed: ${error.message}`);
+      // Don't send credentials for cross-origin requests
+      credentials: 'omit',
+    };
+
+    console.log("[Make.com API] Request options:", {
+      method: requestOptions.method,
+      headers: Object.fromEntries(headers.entries()),
+      mode: requestOptions.mode,
+      credentials: requestOptions.credentials
     });
 
-    // Log response status and headers for debugging
+    const response = await fetch(url, requestOptions);
+
+    // Log response details for debugging
     console.log("[Make.com API] Response status:", response.status);
     console.log("[Make.com API] Response headers:", Object.fromEntries(response.headers.entries()));
 
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error("[Make.com API] Failed to parse JSON response:", parseError);
-      throw new Error("Invalid JSON response from API");
-    }
+    const data = await response.json();
 
     if (!response.ok) {
-      // Parse error response
-      const error = errorResponseSchema.safeParse(data);
-      const errorMessage = error.success 
-        ? error.data.message || error.data.detail 
+      const parsedError = errorResponseSchema.safeParse(data);
+      const errorMessage = parsedError.success
+        ? parsedError.data.message || parsedError.data.detail
         : `API request failed with status ${response.status}`;
       console.error("[Make.com API] Error response:", data);
       throw new Error(errorMessage);
@@ -76,7 +76,8 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
 
     return data;
   } catch (error) {
-    console.error('[Make.com API] Request failed:', error);
+    console.error("[Make.com API] Request failed:", error);
+    // Preserve the original error message
     throw error instanceof Error ? error : new Error('Failed to communicate with Make.com API');
   }
 }
@@ -111,6 +112,9 @@ export async function stopScenario(scenarioId: string): Promise<ScenarioResponse
   return makeRequest(`/scenarios/${scenarioId}/stop`, { method: 'POST' });
 }
 
+/**
+ * Toggle a scenario's state
+ */
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<ScenarioResponse> {
   console.log(`[Make.com API] Toggling scenario ${scenarioId} to ${activate ? 'active' : 'inactive'}`);
   try {
