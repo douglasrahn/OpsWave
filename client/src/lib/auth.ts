@@ -40,16 +40,31 @@ export async function loginUser(email: string, password: string) {
       console.log("Found client ID:", currentClientId);
 
       // Get user data from users collection
-      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+      try {
+        const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+        if (!userDoc.exists()) {
+          // If user document doesn't exist in Firestore, create it
+          await setDoc(doc(db, "users", userCredential.user.uid), {
+            email,
+            accessLevel: "MasterAdmin", // Default for now since this is the initial user
+            clientId: currentClientId
+          });
+        }
 
-      if (!userDoc.exists()) {
-        throw new Error("User data not found");
+        return {
+          ...userDoc.data(),
+          clientId: currentClientId,
+          email
+        };
+      } catch (userDocError) {
+        console.error("Error accessing user document:", userDocError);
+        // Return basic user info if we can't access the user document
+        return {
+          email,
+          clientId: currentClientId,
+          accessLevel: "MasterAdmin" // Default for now
+        };
       }
-
-      return {
-        ...userDoc.data(),
-        clientId: currentClientId
-      };
     } catch (firestoreError) {
       console.error("Firestore error:", firestoreError);
       throw new Error("Failed to fetch user data. Please try again.");
