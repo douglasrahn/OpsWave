@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { PhoneCall, Clock, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
 import { toggleScenario, getScenarioStatus, type ScenarioResponse } from "@/lib/make-api";
 import { getCurrentClientId } from "@/lib/auth";
@@ -16,9 +16,6 @@ interface ScenarioSettings {
   clientId: string;
   serviceId: string;
   scenarioId: string;
-  status: string;
-  name?: string;
-  nextExec?: string;
 }
 
 function isValidScenarioId(id: string): boolean {
@@ -31,7 +28,10 @@ export default function CollectionsDashboardPage() {
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
 
-  const { data: scenarioSettings, refetch, isError, error } = useQuery<ScenarioSettings>({
+  const { data: scenarioData, refetch, isError, error } = useQuery<{
+    settings: ScenarioSettings;
+    status: ScenarioResponse;
+  }>({
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
       console.log("[Dashboard] Fetching scenario settings...");
@@ -54,40 +54,19 @@ export default function CollectionsDashboardPage() {
         throw new Error("No scenario found for this client");
       }
 
-      const scenarioDoc = scenarioSnapshot.docs[0];
-      const scenarioData = scenarioDoc.data();
-      console.log("[Dashboard] Fetched scenario data:", scenarioData);
+      const settings = scenarioSnapshot.docs[0].data() as ScenarioSettings;
+      console.log("[Dashboard] Fetched scenario data:", settings);
 
-      if (!scenarioData.scenarioId || !scenarioData.serviceId || !scenarioData.clientId) {
-        console.error("[Dashboard] Missing required fields in scenario data:", scenarioData);
+      if (!settings.scenarioId || !settings.serviceId || !settings.clientId) {
+        console.error("[Dashboard] Missing required fields in scenario data:", settings);
         throw new Error("Invalid scenario configuration");
       }
 
-      // Get current status from Make.com API
-      try {
-        const makeStatus = await getScenarioStatus(scenarioData.scenarioId);
-        console.log("[Dashboard] Make.com status:", makeStatus);
+      // Get live status from Make.com API
+      const status = await getScenarioStatus(settings.scenarioId);
+      console.log("[Dashboard] Make.com status:", status);
 
-        // Update status if it doesn't match
-        if (makeStatus.status === 'active' && scenarioData.status !== 'active' ||
-            makeStatus.status !== 'active' && scenarioData.status === 'active') {
-          const newStatus = makeStatus.status === 'active' ? 'active' : 'inactive';
-          console.log(`[Dashboard] Updating Firebase status to match Make.com: ${newStatus}`);
-          await updateDoc(doc(db, "scenarios", scenarioDoc.id), {
-            status: newStatus
-          });
-          scenarioData.status = newStatus;
-        }
-
-        // Include additional Make.com data
-        scenarioData.name = makeStatus.name;
-        scenarioData.nextExec = makeStatus.nextExec;
-      } catch (error) {
-        console.error("[Dashboard] Error fetching Make.com status:", error);
-        // Continue with Firebase data if Make.com API fails
-      }
-
-      return scenarioData as ScenarioSettings;
+      return { settings, status };
     },
     refetchInterval: 30000 // Refresh every 30 seconds
   });
@@ -113,8 +92,8 @@ export default function CollectionsDashboardPage() {
   };
 
   const handleToggleService = async (checked: boolean) => {
-    if (!scenarioSettings?.scenarioId) {
-      console.error("[Dashboard] No scenario ID found. Current settings:", scenarioSettings);
+    if (!scenarioData?.settings.scenarioId) {
+      console.error("[Dashboard] No scenario ID found. Current settings:", scenarioData);
       toast({
         title: "Configuration Error",
         description: "No scenario ID found. Please check your Make.com configuration.",
@@ -123,8 +102,8 @@ export default function CollectionsDashboardPage() {
       return;
     }
 
-    if (!isValidScenarioId(scenarioSettings.scenarioId)) {
-      console.error("[Dashboard] Invalid scenario ID format:", scenarioSettings.scenarioId);
+    if (!isValidScenarioId(scenarioData.settings.scenarioId)) {
+      console.error("[Dashboard] Invalid scenario ID format:", scenarioData.settings.scenarioId);
       toast({
         title: "Configuration Error",
         description: "Invalid scenario ID format. Please verify your Make.com scenario ID.",
@@ -135,36 +114,17 @@ export default function CollectionsDashboardPage() {
 
     setIsLoading(true);
     try {
-      console.log(`[Dashboard] Attempting to ${checked ? 'activate' : 'deactivate'} scenario ${scenarioSettings.scenarioId}`);
+      console.log(`[Dashboard] Attempting to ${checked ? 'activate' : 'deactivate'} scenario ${scenarioData.settings.scenarioId}`);
 
-      const success = await toggleScenario(scenarioSettings.scenarioId, checked);
-      console.log('[Dashboard] Toggle scenario result:', success);
+      await toggleScenario(scenarioData.settings.scenarioId, checked);
+      await refetch(); // Refresh the status after toggling
 
-      if (success) {
-        // Update Firebase status
-        const scenarioQuery = query(
-          collection(db, "scenarios"),
-          where("clientId", "==", scenarioSettings.clientId),
-          where("serviceId", "==", "CollectionReminders")
-        );
-        const scenarioSnapshot = await getDocs(scenarioQuery);
-
-        if (!scenarioSnapshot.empty) {
-          const newStatus = checked ? 'active' : 'inactive';
-          console.log(`[Dashboard] Updating Firebase status to: ${newStatus}`);
-
-          await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
-            status: newStatus
-          });
-        }
-
-        toast({
-          title: checked ? "Service Resumed" : "Service Paused",
-          description: checked
-            ? "AI calling agent is now active"
-            : "AI calling agent has been paused"
-        });
-      }
+      toast({
+        title: checked ? "Service Resumed" : "Service Paused",
+        description: checked
+          ? "AI calling agent is now active"
+          : "AI calling agent has been paused"
+      });
     } catch (error) {
       console.error("[Dashboard] Error toggling service:", error);
       const errorMessage = error instanceof Error
@@ -258,7 +218,7 @@ export default function CollectionsDashboardPage() {
           <div className="flex flex-col items-center space-y-4">
             <div className="flex items-center space-x-2">
               <h2 className="text-xl font-semibold">
-                {scenarioSettings?.name || "AI Calling Agent"}
+                {scenarioData?.status.scenario.name || "AI Calling Agent"}
               </h2>
               <Button
                 variant="ghost"
@@ -279,11 +239,11 @@ export default function CollectionsDashboardPage() {
                 </>
               ) : (
                 <>
-                  <span className={`text-sm ${scenarioSettings?.status !== 'active' ? "text-muted-foreground" : ""}`}>
-                    {scenarioSettings?.status === 'active' ? "ACTIVE" : "PAUSED"}
+                  <span className={`text-sm ${!scenarioData?.status.scenario.isActive ? "text-muted-foreground" : ""}`}>
+                    {scenarioData?.status.scenario.isActive ? "ACTIVE" : "PAUSED"}
                   </span>
                   <Switch
-                    checked={scenarioSettings?.status === 'active'}
+                    checked={scenarioData?.status.scenario.isActive}
                     onCheckedChange={handleToggleService}
                     className="scale-125"
                     disabled={isLoading}
@@ -295,9 +255,9 @@ export default function CollectionsDashboardPage() {
               Toggle this switch to pause or resume the AI calling agent.
               When paused, no new calls will be initiated.
             </p>
-            {scenarioSettings?.nextExec && (
+            {scenarioData?.status.scenario.nextExec && (
               <p className="text-sm text-muted-foreground">
-                Next execution: {new Date(scenarioSettings.nextExec).toLocaleString()}
+                Next execution: {new Date(scenarioData.status.scenario.nextExec).toLocaleString()}
               </p>
             )}
           </div>

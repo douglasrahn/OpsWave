@@ -9,22 +9,23 @@ const errorResponseSchema = z.object({
 
 // Success response schema for scenario endpoints
 const scenarioResponseSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  status: z.enum(['active', 'inactive', 'error']),
-  lastExecution: z.string().optional(),
-  nextExec: z.string().optional(),
-  type: z.string(),
-  scheduling: z.object({
-    type: z.string(),
-    interval: z.number().optional(),
-  }).optional(),
-  execution: z.object({
-    mode: z.string(),
-    period: z.string().optional(),
-  }).optional(),
-  teamId: z.string(),
-  folderId: z.string(),
+  scenario: z.object({
+    id: z.string().or(z.number()).transform(String),
+    name: z.string(),
+    teamId: z.string().or(z.number()).transform(String),
+    isActive: z.boolean(),
+    isPaused: z.boolean(),
+    nextExec: z.string().optional(),
+    scheduling: z.object({
+      type: z.string(),
+      interval: z.number().optional(),
+    }).optional(),
+    // Add other fields as optional since we don't use them
+    description: z.string().optional(),
+    lastEdit: z.string().optional(),
+    created: z.string().optional(),
+    usedPackages: z.array(z.string()).optional(),
+  })
 });
 
 export type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
@@ -86,7 +87,7 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioRes
  */
 export async function startScenario(scenarioId: string): Promise<ScenarioResponse> {
   const status = await getScenarioStatus(scenarioId);
-  if (status.status === 'active') {
+  if (status.scenario.isActive) {
     console.log('[Make.com API] Scenario is already active, skipping start request');
     return status;
   }
@@ -98,7 +99,7 @@ export async function startScenario(scenarioId: string): Promise<ScenarioRespons
  */
 export async function stopScenario(scenarioId: string): Promise<ScenarioResponse> {
   const status = await getScenarioStatus(scenarioId);
-  if (status.status !== 'active') {
+  if (!status.scenario.isActive) {
     console.log('[Make.com API] Scenario is not active, skipping stop request');
     return status;
   }
