@@ -1,4 +1,5 @@
-const MAKE_API_KEY = "b9e11e92-2e1e-4b73-b6b0-c53904ad66bc";
+// Get Make.com API key from environment variables
+const MAKE_API_KEY = import.meta.env.VITE_MAKE_API_KEY;
 const MAKE_API_BASE_URL = "https://api.make.com/v2";
 
 interface ScenarioStatus {
@@ -7,6 +8,10 @@ interface ScenarioStatus {
 }
 
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<boolean> {
+  if (!MAKE_API_KEY) {
+    throw new Error("Make.com API key is not configured");
+  }
+
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${activate ? 'activate' : 'deactivate'}`;
 
   try {
@@ -19,14 +24,20 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
       }
     });
 
+    const responseText = await response.text();
+    console.log('Make.com API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText
+    });
+
     if (!response.ok) {
-      const errorText = await response.text();
       console.error('Make.com API Error:', {
         status: response.status,
         statusText: response.statusText,
-        errorText
+        responseText
       });
-      throw new Error(`Failed to ${activate ? 'activate' : 'deactivate'} scenario: ${errorText || response.statusText}`);
+      throw new Error(`Failed to ${activate ? 'activate' : 'deactivate'} scenario: ${responseText || response.statusText}`);
     }
 
     return true;
@@ -37,6 +48,10 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 }
 
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioStatus> {
+  if (!MAKE_API_KEY) {
+    throw new Error("Make.com API key is not configured");
+  }
+
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
 
   try {
@@ -49,17 +64,30 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
       }
     });
 
+    const responseText = await response.text();
+    console.log('Make.com API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText
+    });
+
     if (!response.ok) {
-      const errorText = await response.text();
       console.error('Make.com API Error:', {
         status: response.status,
         statusText: response.statusText,
-        errorText
+        responseText
       });
-      throw new Error(`Failed to get scenario status: ${errorText || response.statusText}`);
+      throw new Error(`Failed to get scenario status: ${responseText || response.statusText}`);
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError);
+      throw new Error('Invalid response format from Make.com API');
+    }
+
     return {
       status: data.status,
       message: data.statusMessage
