@@ -33,6 +33,7 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
     const method = options.method || 'GET';
     console.log(`[Make.com API] Making ${method} request:`, {
       url: endpoint,
+      fullUrl: `${window.location.origin}${endpoint}`,
       method,
       headers: options.headers,
       options
@@ -123,8 +124,8 @@ export async function stopScenario(scenarioId: string): Promise<ScenarioResponse
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<ScenarioResponse> {
   console.log(`[Make.com API] Toggling scenario ${scenarioId} to ${activate ? 'active' : 'inactive'}`);
   try {
-    const response = activate ? 
-      await startScenario(scenarioId) : 
+    const response = activate ?
+      await startScenario(scenarioId) :
       await stopScenario(scenarioId);
 
     console.log(`[Make.com API] Successfully ${activate ? 'started' : 'stopped'} scenario:`, response);
