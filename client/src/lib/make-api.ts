@@ -1,4 +1,4 @@
-import { apiRequest } from "./queryClient";
+import { z } from "zod";
 
 interface ScenarioStatus {
   status: string;
@@ -29,6 +29,38 @@ interface MakeApiResponse {
   };
 }
 
+// Separate function for Make.com API requests to handle CORS properly
+async function makeFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const makeApiKey = import.meta.env.VITE_MAKE_API_KEY;
+  if (!makeApiKey) {
+    throw new Error("Make.com API key not found in environment variables");
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Authorization": `Token ${makeApiKey}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+    // Don't include credentials for cross-origin requests
+    credentials: 'omit',
+    mode: 'cors',
+  });
+
+  if (!response.ok) {
+    const errorData: MakeApiError = await response.json();
+    console.error("[Make.com API] Error response:", {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+    });
+    throw new Error(errorData.message || errorData.detail || "Make.com API request failed");
+  }
+
+  return response;
+}
+
 export async function toggleScenario(
   scenarioId: string,
   activate: boolean,
@@ -43,24 +75,9 @@ export async function toggleScenario(
       '\nRequest URL:', url,
     );
 
-    const response = await apiRequest("POST", url, {
-      headers: {
-        Authorization: `Token ${import.meta.env.VITE_MAKE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+    const response = await makeFetch(url, {
+      method: "POST",
     });
-
-    if (!response.ok) {
-      const errorData: MakeApiError = await response.json();
-      console.log("[Make.com API] Error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
-      });
-      throw new Error(
-        errorData.message || errorData.detail || `Failed to ${action} scenario`
-      );
-    }
 
     const data: MakeApiResponse = await response.json();
     console.log('[Make.com API] Toggle response:', data);
@@ -85,22 +102,9 @@ export async function getScenarioStatus(
 
     console.log("[Make.com API] Request URL:", url);
 
-    const response = await apiRequest("GET", url, {
-      headers: {
-        Authorization: `Token ${import.meta.env.VITE_MAKE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+    const response = await makeFetch(url, {
+      method: "GET",
     });
-
-    if (!response.ok) {
-      const errorData: MakeApiError = await response.json();
-      console.log("[Make.com API] Error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
-      });
-      throw new Error(errorData.message || errorData.detail || "Failed to get scenario status");
-    }
 
     const data: MakeApiResponse = await response.json();
     console.log("[Make.com API] Raw response:", data);
