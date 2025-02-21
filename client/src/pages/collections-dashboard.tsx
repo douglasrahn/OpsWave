@@ -28,8 +28,6 @@ function isValidScenarioId(id: string): boolean {
 
 export default function CollectionsDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [scenarioStatus, setScenarioStatus] = useState<string>("");
-  const [isStatusLoading, setIsStatusLoading] = useState(true);
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
 
@@ -37,16 +35,15 @@ export default function CollectionsDashboardPage() {
   const { data: scenarioSettings, refetch, isError, error } = useQuery<ScenarioSettings>({
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
-      console.log("Fetching scenario settings...");
+      console.log("[Dashboard] Fetching scenario settings...");
 
       const clientId = getCurrentClientId();
       if (!clientId) {
-        console.error("No client ID found in session");
-        setLocation("/login"); // Redirect to login if no client ID
+        console.error("[Dashboard] No client ID found in session");
+        setLocation("/login");
         throw new Error("Please log in again");
       }
 
-      // Get scenario document using client ID
       const scenarioQuery = query(
         collection(db, "scenarios"),
         where("clientId", "==", clientId),
@@ -60,11 +57,10 @@ export default function CollectionsDashboardPage() {
 
       const scenarioDoc = scenarioSnapshot.docs[0];
       const data = scenarioDoc.data() as ScenarioSettings;
-      console.log("Fetched scenario settings:", data);
+      console.log("[Dashboard] Fetched scenario settings:", data);
 
-      // Verify required fields
       if (!data.scenarioId || !data.serviceId || !data.clientId) {
-        console.error("Missing required fields in scenario data:", data);
+        console.error("[Dashboard] Missing required fields in scenario data:", data);
         throw new Error("Invalid scenario configuration");
       }
 
@@ -72,17 +68,38 @@ export default function CollectionsDashboardPage() {
     }
   });
 
-  // Fetch initial scenario status from Make.com
-  useEffect(() => {
-    async function fetchScenarioStatus() {
-      if (!scenarioSettings?.scenarioId) return;
 
-      setIsStatusLoading(true);
-      try {
-        const status = await getScenarioStatus(scenarioSettings.scenarioId);
-        console.log("Initial scenario status from Make.com:", status);
+  // Handle toggle service
+  const handleToggleService = async (checked: boolean) => {
+    if (!scenarioSettings?.scenarioId) {
+      console.error("[Dashboard] No scenario ID found. Current settings:", scenarioSettings);
+      toast({
+        title: "Configuration Error",
+        description: "No scenario ID found. Please check your Make.com configuration.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-        // Update the status in Firebase to match Make.com
+    if (!isValidScenarioId(scenarioSettings.scenarioId)) {
+      console.error("[Dashboard] Invalid scenario ID format:", scenarioSettings.scenarioId);
+      toast({
+        title: "Configuration Error",
+        description: "Invalid scenario ID format. Please verify your Make.com scenario ID.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log(`[Dashboard] Attempting to ${checked ? 'activate' : 'deactivate'} scenario ${scenarioSettings.scenarioId}`);
+
+      const success = await toggleScenario(scenarioSettings.scenarioId, checked);
+      console.log('[Dashboard] Toggle scenario result:', success);
+
+      if (success) {
+        // Update status in Firebase
         const scenarioQuery = query(
           collection(db, "scenarios"),
           where("clientId", "==", scenarioSettings.clientId),
@@ -91,32 +108,38 @@ export default function CollectionsDashboardPage() {
         const scenarioSnapshot = await getDocs(scenarioQuery);
 
         if (!scenarioSnapshot.empty) {
+          const newStatus = checked ? 'active' : 'inactive';
+          console.log(`[Dashboard] Updating Firebase status to: ${newStatus}`);
+
           await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
-            status: status.status,
-            name: status.name,
-            nextExec: status.nextExec
+            status: newStatus
           });
         }
 
-        setScenarioStatus(status.status);
-        await refetch(); // Refresh the data to get updated status
-      } catch (error) {
-        console.error("Error fetching initial scenario status:", error);
-        const errorMessage = error instanceof Error
-          ? error.message
-          : "Failed to fetch scenario status from Make.com";
-        toast({
-          title: "Warning",
-          description: errorMessage,
-          variant: "destructive"
-        });
-      } finally {
-        setIsStatusLoading(false);
-      }
-    }
+        // Refresh the data
+        await refetch();
 
-    fetchScenarioStatus();
-  }, [scenarioSettings?.scenarioId, toast, refetch]);
+        toast({
+          title: checked ? "Service Resumed" : "Service Paused",
+          description: checked
+            ? "AI calling agent is now active"
+            : "AI calling agent has been paused"
+        });
+      }
+    } catch (error) {
+      console.error("[Dashboard] Error toggling service:", error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : "Network error while updating service. Please check your connection and try again.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Display error toast if query fails
   useEffect(() => {
@@ -129,102 +152,6 @@ export default function CollectionsDashboardPage() {
       });
     }
   }, [isError, error, toast]);
-
-  // Update the handleToggleService function
-  const handleToggleService = async (checked: boolean) => {
-    if (!scenarioSettings?.scenarioId) {
-      console.error("No scenario ID found. Current settings:", scenarioSettings);
-      toast({
-        title: "Configuration Error",
-        description: "No scenario ID found. Please check your Make.com configuration.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!isValidScenarioId(scenarioSettings.scenarioId)) {
-      console.error("Invalid scenario ID format:", scenarioSettings.scenarioId);
-      toast({
-        title: "Configuration Error",
-        description: "Invalid scenario ID format. Please verify your Make.com scenario ID.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      console.log(`Attempting to ${checked ? 'activate' : 'deactivate'} scenario ${scenarioSettings.scenarioId}`);
-
-      // Rest of the function remains the same
-      const success = await toggleScenario(scenarioSettings.scenarioId, checked);
-      console.log('Toggle scenario result:', success);
-
-      if (success) {
-        // Update status in Firebase
-        const scenarioQuery = query(
-          collection(db, "scenarios"),
-          where("clientId", "==", scenarioSettings.clientId),
-          where("serviceId", "==", "CollectionReminders")
-        );
-        const scenarioSnapshot = await getDocs(scenarioQuery);
-
-        if (!scenarioSnapshot.empty) {
-          await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
-            status: checked ? "active" : "inactive"
-          });
-        }
-
-        // Check scenario status after a short delay
-        setTimeout(async () => {
-          try {
-            const status = await getScenarioStatus(scenarioSettings.scenarioId);
-            console.log("Updated scenario status:", status);
-            setScenarioStatus(status.status);
-
-            // Store additional scenario information
-            if (scenarioSnapshot.docs[0]) {
-              await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
-                name: status.name,
-                nextExec: status.nextExec
-              });
-            }
-
-            await refetch(); // Refresh the data
-            toast({
-              title: checked ? "Service Resumed" : "Service Paused",
-              description: checked
-                ? "AI calling agent is now active"
-                : "AI calling agent has been paused"
-            });
-          } catch (error) {
-            console.error("Error checking scenario status:", error);
-            const errorMessage = error instanceof Error
-              ? error.message
-              : "Network error while verifying scenario status. Please check your connection.";
-            toast({
-              title: "Warning",
-              description: errorMessage,
-              variant: "destructive"
-            });
-          } finally {
-            setIsLoading(false);
-          }
-        }, 3000);
-      }
-    } catch (error) {
-      console.error("Error toggling service:", error);
-      const errorMessage = error instanceof Error
-        ? error.message
-        : "Network error while updating service. Please check your connection and try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-      setIsLoading(false);
-    }
-  };
 
   if (isError) {
     return (
@@ -294,11 +221,12 @@ export default function CollectionsDashboardPage() {
               {scenarioSettings?.name || "AI Calling Agent"}
             </h2>
             <div className="flex items-center space-x-4">
-              {isStatusLoading ? (
+              {/*isStatusLoading is removed as the loading state is handled within handleToggleService*/}
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm text-muted-foreground">
-                    Checking status...
+                    Updating status...
                   </span>
                 </>
               ) : (
@@ -310,7 +238,7 @@ export default function CollectionsDashboardPage() {
                     checked={scenarioSettings?.status === 'active'}
                     onCheckedChange={handleToggleService}
                     className="scale-125"
-                    disabled={isLoading || isStatusLoading}
+                    disabled={isLoading}
                   />
                 </>
               )}
@@ -324,11 +252,7 @@ export default function CollectionsDashboardPage() {
                 Next execution: {new Date(scenarioSettings.nextExec).toLocaleString()}
               </p>
             )}
-            {scenarioStatus && (
-              <p className="text-sm text-muted-foreground">
-                Current scenario status: {scenarioStatus}
-              </p>
-            )}
+            {/*scenarioStatus is removed as it's redundant with scenarioSettings.status*/}
           </div>
         </CardContent>
       </Card>
