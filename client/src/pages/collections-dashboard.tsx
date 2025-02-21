@@ -126,7 +126,9 @@ export default function CollectionsDashboardPage() {
             });
           } catch (error) {
             console.error("Error checking scenario status:", error);
-            const errorMessage = error instanceof Error ? error.message : "Could not verify scenario status";
+            const errorMessage = error instanceof Error 
+              ? error.message 
+              : "Network error while verifying scenario status. Please check your connection.";
             toast({
               title: "Warning",
               description: errorMessage,
@@ -139,7 +141,9 @@ export default function CollectionsDashboardPage() {
       }
     } catch (error) {
       console.error("Error toggling service:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to update service status";
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Network error while updating service. Please check your connection and try again.";
       toast({
         title: "Error",
         description: errorMessage,

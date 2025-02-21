@@ -28,7 +28,9 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
       headers: {
         'Authorization': `Bearer ${MAKE_API_KEY}`,
         'Content-Type': 'application/json'
-      }
+      },
+      mode: 'cors',
+      credentials: 'omit'
     });
 
     const responseText = await response.text();
@@ -84,7 +86,9 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
       headers: {
         'Authorization': `Bearer ${MAKE_API_KEY}`,
         'Content-Type': 'application/json'
-      }
+      },
+      mode: 'cors',
+      credentials: 'omit'
     });
 
     const responseText = await response.text();
