@@ -16,6 +16,8 @@ interface ScenarioSettings {
   serviceId: string;
   scenarioId: string;
   status: string;
+  name?: string;
+  nextExec?: string;
 }
 
 export default function CollectionsDashboardPage() {
@@ -84,7 +86,9 @@ export default function CollectionsDashboardPage() {
 
         if (!scenarioSnapshot.empty) {
           await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
-            status: status.status
+            status: status.status,
+            name: status.name,
+            nextExec: status.nextExec
           });
         }
 
@@ -92,8 +96,8 @@ export default function CollectionsDashboardPage() {
         await refetch(); // Refresh the data to get updated status
       } catch (error) {
         console.error("Error fetching initial scenario status:", error);
-        const errorMessage = error instanceof Error 
-          ? error.message 
+        const errorMessage = error instanceof Error
+          ? error.message
           : "Failed to fetch scenario status from Make.com";
         toast({
           title: "Warning",
@@ -161,17 +165,25 @@ export default function CollectionsDashboardPage() {
             console.log("Updated scenario status:", status);
             setScenarioStatus(status.status);
 
+            // Store additional scenario information
+            if (scenarioSnapshot.docs[0]) {
+              await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
+                name: status.name,
+                nextExec: status.nextExec
+              });
+            }
+
             await refetch(); // Refresh the data
             toast({
               title: checked ? "Service Resumed" : "Service Paused",
-              description: checked 
-                ? "AI calling agent is now active" 
+              description: checked
+                ? "AI calling agent is now active"
                 : "AI calling agent has been paused"
             });
           } catch (error) {
             console.error("Error checking scenario status:", error);
-            const errorMessage = error instanceof Error 
-              ? error.message 
+            const errorMessage = error instanceof Error
+              ? error.message
               : "Network error while verifying scenario status. Please check your connection.";
             toast({
               title: "Warning",
@@ -185,8 +197,8 @@ export default function CollectionsDashboardPage() {
       }
     } catch (error) {
       console.error("Error toggling service:", error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : "Network error while updating service. Please check your connection and try again.";
       toast({
         title: "Error",
@@ -203,7 +215,7 @@ export default function CollectionsDashboardPage() {
         <div className="p-6">
           <h1 className="text-2xl font-bold text-red-600">Error Loading Dashboard</h1>
           <p className="mt-2 text-gray-600">
-            {error instanceof Error && error.message.includes("API token") 
+            {error instanceof Error && error.message.includes("API token")
               ? "Unable to connect to Make.com. Please check your API token configuration."
               : "Unable to load scenario settings. Please try refreshing the page."}
           </p>
@@ -261,7 +273,9 @@ export default function CollectionsDashboardPage() {
       <Card className="mb-8">
         <CardContent className="pt-6">
           <div className="flex flex-col items-center space-y-4">
-            <h2 className="text-xl font-semibold">AI Calling Agent</h2>
+            <h2 className="text-xl font-semibold">
+              {scenarioSettings?.name || "AI Calling Agent"}
+            </h2>
             <div className="flex items-center space-x-4">
               {isStatusLoading ? (
                 <>
@@ -285,9 +299,14 @@ export default function CollectionsDashboardPage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              Toggle this switch to pause or resume the AI calling agent. 
+              Toggle this switch to pause or resume the AI calling agent.
               When paused, no new calls will be initiated.
             </p>
+            {scenarioSettings?.nextExec && (
+              <p className="text-sm text-muted-foreground">
+                Next execution: {new Date(scenarioSettings.nextExec).toLocaleString()}
+              </p>
+            )}
             {scenarioStatus && (
               <p className="text-sm text-muted-foreground">
                 Current scenario status: {scenarioStatus}

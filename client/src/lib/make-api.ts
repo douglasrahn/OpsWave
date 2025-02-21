@@ -1,10 +1,13 @@
 // Get Make.com API key from environment variables
 const MAKE_API_KEY = import.meta.env.VITE_MAKE_API_KEY;
-const MAKE_API_BASE_URL = "https://eu1.make.com/api/v2";
+const MAKE_API_BASE_URL = "https://us1.make.com/api/v2";
 
 interface ScenarioStatus {
   status: string;
   message?: string;
+  isActive: boolean;
+  name: string;
+  nextExec?: string;
 }
 
 interface MakeApiError {
@@ -12,6 +15,20 @@ interface MakeApiError {
   message: string;
   code: string;
   suberrors?: any[];
+}
+
+interface MakeApiResponse {
+  scenario: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    isPaused: boolean;
+    nextExec?: string;
+    scheduling?: {
+      type: string;
+      interval: number;
+    };
+  };
 }
 
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<boolean> {
@@ -135,7 +152,7 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
       throw new Error(errorMessage);
     }
 
-    let data;
+    let data: MakeApiResponse;
     try {
       data = JSON.parse(responseText);
       console.log('Parsed scenario data:', data);
@@ -144,14 +161,17 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
       throw new Error('Invalid response format from Make.com API');
     }
 
-    if (!data || typeof data.status !== 'string') {
+    if (!data?.scenario) {
       console.error('Invalid scenario data format:', data);
       throw new Error('Invalid scenario data format received from Make.com API');
     }
 
     return {
-      status: data.status,
-      message: data.statusMessage || data.message
+      status: data.scenario.isActive ? 'active' : 'inactive',
+      isActive: data.scenario.isActive,
+      name: data.scenario.name,
+      nextExec: data.scenario.nextExec,
+      message: data.scenario.isPaused ? 'Scenario is paused' : undefined
     };
   } catch (error) {
     console.error('Error getting scenario status:', error);
