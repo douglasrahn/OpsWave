@@ -72,7 +72,7 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
-      // Verify the toggle was successful by checking the updated status
+      // Verify the toggle was successful
       const updatedStatus = await getScenarioStatus(scenarioId);
       console.log('[Make.com API] Status after toggle:', updatedStatus);
 
