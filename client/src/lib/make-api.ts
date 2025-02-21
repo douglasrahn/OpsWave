@@ -28,6 +28,7 @@ type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
 async function makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   const apiKey = import.meta.env.VITE_MAKE_API_KEY;
   if (!apiKey) {
+    console.error("[Make.com API] No API key found in environment variables");
     throw new Error("Make.com API key not found");
   }
 
@@ -39,20 +40,38 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
 
   try {
     console.log(`[Make.com API] Making ${options.method || 'GET'} request to:`, endpoint);
+    console.log("[Make.com API] Request headers:", headers);
 
     const response = await fetch(url, {
       ...options,
       headers,
       credentials: 'omit',
       mode: 'cors',
+    }).catch(error => {
+      console.error("[Make.com API] Fetch failed:", error);
+      throw new Error(`Network request failed: ${error.message}`);
     });
 
-    const data = await response.json();
+    // Log response status and headers for debugging
+    console.log("[Make.com API] Response status:", response.status);
+    console.log("[Make.com API] Response headers:", Object.fromEntries(response.headers.entries()));
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.error("[Make.com API] Failed to parse JSON response:", parseError);
+      throw new Error("Invalid JSON response from API");
+    }
 
     if (!response.ok) {
       // Parse error response
-      const error = errorResponseSchema.parse(data);
-      throw new Error(error.message || error.detail || `API request failed with status ${response.status}`);
+      const error = errorResponseSchema.safeParse(data);
+      const errorMessage = error.success 
+        ? error.data.message || error.data.detail 
+        : `API request failed with status ${response.status}`;
+      console.error("[Make.com API] Error response:", data);
+      throw new Error(errorMessage);
     }
 
     return data;
