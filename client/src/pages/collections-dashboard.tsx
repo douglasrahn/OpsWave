@@ -91,53 +91,58 @@ export default function CollectionsDashboardPage() {
       console.log(`Toggling scenario ${scenarioSettings.scenarioId} to ${checked ? 'active' : 'inactive'}`);
 
       // Toggle the scenario in Make.com
-      await toggleScenario(scenarioSettings.scenarioId, checked);
+      const success = await toggleScenario(scenarioSettings.scenarioId, checked);
+      console.log('Toggle scenario result:', success);
 
-      // Update status in Firebase
-      const scenarioQuery = query(
-        collection(db, "scenarios"),
-        where("clientId", "==", scenarioSettings.clientId),
-        where("serviceId", "==", "CollectionReminders")
-      );
-      const scenarioSnapshot = await getDocs(scenarioQuery);
+      if (success) {
+        // Update status in Firebase
+        const scenarioQuery = query(
+          collection(db, "scenarios"),
+          where("clientId", "==", scenarioSettings.clientId),
+          where("serviceId", "==", "CollectionReminders")
+        );
+        const scenarioSnapshot = await getDocs(scenarioQuery);
 
-      if (!scenarioSnapshot.empty) {
-        await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
-          status: checked ? "active" : "inactive"
-        });
-      }
-
-      // Wait 3 seconds and check status
-      setTimeout(async () => {
-        try {
-          const status = await getScenarioStatus(scenarioSettings.scenarioId);
-          console.log("Updated scenario status:", status);
-          setScenarioStatus(status.status);
-
-          await refetch(); // Refresh the data
-
-          toast({
-            title: checked ? "Service Resumed" : "Service Paused",
-            description: checked 
-              ? "AI calling agent is now active" 
-              : "AI calling agent has been paused"
+        if (!scenarioSnapshot.empty) {
+          await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
+            status: checked ? "active" : "inactive"
           });
-        } catch (error) {
-          console.error("Error checking scenario status:", error);
-          toast({
-            title: "Warning",
-            description: "Could not verify scenario status",
-            variant: "destructive"
-          });
-        } finally {
-          setIsLoading(false);
         }
-      }, 3000);
+
+        // Check scenario status after a short delay
+        setTimeout(async () => {
+          try {
+            const status = await getScenarioStatus(scenarioSettings.scenarioId);
+            console.log("Updated scenario status:", status);
+            setScenarioStatus(status.status);
+
+            await refetch(); // Refresh the data
+
+            toast({
+              title: checked ? "Service Resumed" : "Service Paused",
+              description: checked 
+                ? "AI calling agent is now active" 
+                : "AI calling agent has been paused"
+            });
+          } catch (error) {
+            console.error("Error checking scenario status:", error);
+            const errorMessage = error instanceof Error ? error.message : "Could not verify scenario status";
+            toast({
+              title: "Warning",
+              description: errorMessage,
+              variant: "destructive"
+            });
+          } finally {
+            setIsLoading(false);
+          }
+        }, 3000);
+      }
     } catch (error) {
       console.error("Error toggling service:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to update service status";
       toast({
         title: "Error",
-        description: "Failed to update service status",
+        description: errorMessage,
         variant: "destructive"
       });
       setIsLoading(false);

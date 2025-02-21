@@ -1,5 +1,5 @@
 const MAKE_API_KEY = "b9e11e92-2e1e-4b73-b6b0-c53904ad66bc";
-const MAKE_API_BASE_URL = "https://eu1.make.com/api/v2";
+const MAKE_API_BASE_URL = "https://api.make.com/v2";
 
 interface ScenarioStatus {
   status: string;
@@ -10,18 +10,22 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${activate ? 'activate' : 'deactivate'}`;
 
   try {
+    console.log(`Making API call to ${endpoint}`);
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${MAKE_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      mode: 'cors'
+        'Authorization': `Bearer ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Make.com API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText
+      });
       throw new Error(`Failed to ${activate ? 'activate' : 'deactivate'} scenario: ${errorText || response.statusText}`);
     }
 
@@ -36,17 +40,22 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
   const endpoint = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
 
   try {
+    console.log(`Checking scenario status at ${endpoint}`);
     const response = await fetch(endpoint, {
+      method: 'GET',
       headers: {
-        'Authorization': `Token ${MAKE_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      mode: 'cors'
+        'Authorization': `Bearer ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Make.com API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText
+      });
       throw new Error(`Failed to get scenario status: ${errorText || response.statusText}`);
     }
 
