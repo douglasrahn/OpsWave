@@ -33,7 +33,6 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
   try {
     // First get the current status to verify the intended action
     const currentStatus = await getScenarioStatus(scenarioId);
-    console.log('Current scenario status:', currentStatus);
 
     // Only proceed if the current status matches our intent to change
     if (currentStatus.isActive === activate) {
@@ -46,15 +45,13 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 
     try {
       const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to ${action} scenario: ${errorText}`);
-      }
+      const data: MakeApiResponse = await response.json();
 
-      // Verify the toggle was successful by checking the new status
+      // Log the parsed response for debugging
+      console.log('Toggle scenario response:', data);
+
+      // Verify the toggle was successful
       const updatedStatus = await getScenarioStatus(scenarioId);
-      console.log('Updated scenario status:', updatedStatus);
-
       if (updatedStatus.isActive !== activate) {
         throw new Error(`Failed to ${action} scenario. Status remains ${updatedStatus.status}`);
       }
@@ -75,25 +72,22 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioStatus> {
   try {
     const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to get scenario status: ${errorText}`);
-    }
+    const data: MakeApiResponse = await response.json();
 
-    const data = await response.json();
+    // Log the parsed response for debugging
     console.log('Get scenario status response:', data);
 
-    if (!data || typeof data !== 'object') {
+    if (!data?.scenario) {
       console.error('Invalid scenario data format:', data);
       throw new Error('Invalid scenario data format received from Make.com API');
     }
 
     return {
-      status: data.isActive ? 'active' : 'inactive',
-      isActive: data.isActive,
-      name: data.name,
-      nextExec: data.nextExec,
-      message: data.message
+      status: data.scenario.isActive ? 'active' : 'inactive',
+      isActive: data.scenario.isActive,
+      name: data.scenario.name,
+      nextExec: data.scenario.nextExec,
+      message: data.scenario.isPaused ? 'Scenario is paused' : undefined
     };
   } catch (error) {
     console.error('Error getting scenario status:', error);
