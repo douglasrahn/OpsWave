@@ -18,8 +18,33 @@ export function registerRoutes(app: Express): Server {
         'Content-Type': 'application/json'
       };
 
+      // Log the full request details (with redacted token)
+      console.log('[Make.com API] Request details:', {
+        url,
+        method: 'GET',
+        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
+      });
+
       const response = await fetch(url, { headers });
-      const data = await response.json();
+
+      // Log response details
+      console.log('[Make.com API] Response status:', response.status);
+      console.log('[Make.com API] Response headers:', response.headers.raw());
+
+      // Get response text first for logging
+      const responseText = await response.text();
+      console.log('[Make.com API] Raw response:', responseText);
+
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error('[Make.com API] Failed to parse response as JSON:', error);
+        return res.status(500).json({
+          error: 'Invalid JSON response from Make.com API'
+        });
+      }
 
       if (!response.ok) {
         return res.status(response.status).json({
@@ -55,12 +80,36 @@ export function registerRoutes(app: Express): Server {
         'Content-Type': 'application/json'
       };
 
+      // Log the full request details (with redacted token)
+      console.log('[Make.com API] Request details:', {
+        url,
+        method: 'POST',
+        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
+      });
+
       const response = await fetch(url, {
         method: 'POST',
         headers
       });
 
-      const data = await response.json();
+      // Log response details
+      console.log('[Make.com API] Response status:', response.status);
+      console.log('[Make.com API] Response headers:', response.headers.raw());
+
+      // Get response text first for logging
+      const responseText = await response.text();
+      console.log('[Make.com API] Raw response:', responseText);
+
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error('[Make.com API] Failed to parse response as JSON:', error);
+        return res.status(500).json({
+          error: 'Invalid JSON response from Make.com API'
+        });
+      }
 
       if (!response.ok) {
         return res.status(response.status).json({
@@ -68,11 +117,13 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Get updated scenario status
+      // Get updated scenario status with the same detailed logging
+      console.log('[Make.com API] Fetching updated scenario status');
       const statusResponse = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, { headers });
-      const statusData = await statusResponse.json();
+      const statusText = await statusResponse.text();
+      console.log('[Make.com API] Status response:', statusText);
 
-      // Return the raw Make.com API response
+      const statusData = JSON.parse(statusText);
       res.json(statusData);
     } catch (error) {
       console.error('[Make.com API] Request failed:', error);

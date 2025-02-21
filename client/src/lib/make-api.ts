@@ -30,7 +30,12 @@ export type ScenarioResponse = {
  */
 async function makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   try {
-    console.log(`[Make.com API] Making ${options.method || 'GET'} request to:`, endpoint);
+    const method = options.method || 'GET';
+    console.log(`[Make.com API] Making ${method} request:`, {
+      url: endpoint,
+      method,
+      headers: options.headers || {},
+    });
 
     const response = await fetch(endpoint, {
       ...options,
@@ -41,8 +46,10 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
 
     // Log response details for debugging
     console.log("[Make.com API] Response status:", response.status);
+    console.log("[Make.com API] Response headers:", Object.fromEntries(response.headers.entries()));
 
     const data = await response.json();
+    console.log("[Make.com API] Response data:", data);
 
     if (!response.ok) {
       const errorMessage = data.error || `API request failed with status ${response.status}`;
@@ -61,13 +68,15 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
  * Get the current status of a scenario
  */
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioResponse> {
+  console.log(`[Make.com API] Getting status for scenario ${scenarioId}`);
   const rawData = await makeRequest(`/api/scenarios/${scenarioId}`);
 
   // Parse and validate the raw API response
   const validatedData = scenarioResponseSchema.parse(rawData);
+  console.log("[Make.com API] Validated data:", validatedData);
 
   // Transform the validated data into our application's format
-  return {
+  const transformedData = {
     scenario: {
       id: validatedData.id.toString(),
       name: validatedData.name,
@@ -76,6 +85,8 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioRes
       description: validatedData.description,
     }
   };
+  console.log("[Make.com API] Transformed data:", transformedData);
+  return transformedData;
 }
 
 /**
