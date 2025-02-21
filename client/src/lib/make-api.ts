@@ -43,19 +43,26 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
     const action = activate ? 'activate' : 'deactivate';
     console.log(`Toggling scenario ${scenarioId} to ${action}`);
 
-    const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
-    const data: MakeApiResponse = await response.json();
+    try {
+      const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
+      const data: MakeApiResponse = await response.json();
 
-    // Log the parsed response for debugging
-    console.log('Toggle scenario response:', data);
+      // Log the parsed response for debugging
+      console.log('Toggle scenario response:', data);
 
-    // Verify the toggle was successful
-    const updatedStatus = await getScenarioStatus(scenarioId);
-    if (updatedStatus.isActive !== activate) {
-      throw new Error(`Failed to ${action} scenario. Status remains ${updatedStatus.status}`);
+      // Verify the toggle was successful
+      const updatedStatus = await getScenarioStatus(scenarioId);
+      if (updatedStatus.isActive !== activate) {
+        throw new Error(`Failed to ${action} scenario. Status remains ${updatedStatus.status}`);
+      }
+
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        throw new Error(`Scenario ${scenarioId} not found. Please verify your scenario ID.`);
+      }
+      throw error;
     }
-
-    return true;
   } catch (error) {
     console.error('Error toggling scenario:', error);
     throw error;
@@ -84,6 +91,9 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
     };
   } catch (error) {
     console.error('Error getting scenario status:', error);
+    if (error instanceof Error && error.message.includes('not found')) {
+      throw new Error(`Scenario ${scenarioId} not found. Please verify your scenario ID.`);
+    }
     throw error;
   }
 }

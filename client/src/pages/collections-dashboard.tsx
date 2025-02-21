@@ -20,6 +20,12 @@ interface ScenarioSettings {
   nextExec?: string;
 }
 
+// Add this validation function at the top of the file
+function isValidScenarioId(id: string): boolean {
+  // Make.com scenario IDs are typically numeric
+  return /^\d+$/.test(id);
+}
+
 export default function CollectionsDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [scenarioStatus, setScenarioStatus] = useState<string>("");
@@ -124,12 +130,23 @@ export default function CollectionsDashboardPage() {
     }
   }, [isError, error, toast]);
 
+  // Update the handleToggleService function
   const handleToggleService = async (checked: boolean) => {
     if (!scenarioSettings?.scenarioId) {
       console.error("No scenario ID found. Current settings:", scenarioSettings);
       toast({
-        title: "Error",
-        description: "No scenario ID found",
+        title: "Configuration Error",
+        description: "No scenario ID found. Please check your Make.com configuration.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!isValidScenarioId(scenarioSettings.scenarioId)) {
+      console.error("Invalid scenario ID format:", scenarioSettings.scenarioId);
+      toast({
+        title: "Configuration Error",
+        description: "Invalid scenario ID format. Please verify your Make.com scenario ID.",
         variant: "destructive"
       });
       return;
@@ -137,9 +154,9 @@ export default function CollectionsDashboardPage() {
 
     setIsLoading(true);
     try {
-      console.log(`Toggling scenario ${scenarioSettings.scenarioId} to ${checked ? 'active' : 'inactive'}`);
+      console.log(`Attempting to ${checked ? 'activate' : 'deactivate'} scenario ${scenarioSettings.scenarioId}`);
 
-      // Toggle the scenario in Make.com
+      // Rest of the function remains the same
       const success = await toggleScenario(scenarioSettings.scenarioId, checked);
       console.log('Toggle scenario result:', success);
 

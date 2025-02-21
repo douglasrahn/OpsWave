@@ -1,84 +1,169 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import fetch from "node-fetch";
+import express from 'express';
+import fetch from 'node-fetch';
 
 const MAKE_API_KEY = process.env.MAKE_API_KEY;
-const MAKE_API_BASE_URL = "https://us1.make.com/api/v2";
+const MAKE_API_BASE_URL = 'https://eu1.make.com/api/v2';
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  app.get("/api/scenarios/:scenarioId", async (req, res) => {
+export function registerRoutes(app: Express): Server {
+  // Get scenario status
+  app.get('/api/scenarios/:scenarioId', async (req, res) => {
     try {
-      if (!MAKE_API_KEY) {
-        throw new Error("Make.com API key is not configured");
-      }
-
       const { scenarioId } = req.params;
-      const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, {
+      console.log(`[Make.com API] Getting status for scenario ${scenarioId}`);
+
+      // Log the full request URL and headers
+      const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
+      const headers = {
+        'Authorization': `Token ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      };
+      console.log('[Make.com API] Request details:', {
+        url,
         method: 'GET',
-        headers: {
-          'Authorization': `Token ${MAKE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
       });
 
-      const data = await response.json();
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
 
       // Log the raw response for debugging
-      console.log('Make.com API Response:', JSON.stringify(data, null, 2));
+      const responseText = await response.text();
+      console.log('[Make.com API] Raw response:', responseText);
 
       if (!response.ok) {
-        // Handle error responses
-        if (data.code === 'SC401') {
-          throw new Error('Invalid or expired API token. Please check your Make.com API token configuration.');
+        console.error('[Make.com API] Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseText
+        });
+
+        if (response.status === 404) {
+          return res.status(404).json({
+            error: 'Scenario not found. Please verify your scenario ID and API token permissions.'
+          });
         }
-        throw new Error(data.message || data.detail || response.statusText);
+
+        return res.status(response.status).json({
+          error: `Make.com API error: ${response.statusText}`,
+          details: responseText
+        });
       }
 
-      if (!data.scenario) {
-        throw new Error('Invalid response format from Make.com API');
+      // Parse the response text as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[Make.com API] Failed to parse response as JSON:', parseError);
+        return res.status(500).json({
+          error: 'Invalid response format from Make.com API',
+          details: responseText
+        });
       }
 
-      res.json(data);
+      // Validate and transform the response
+      if (!data || typeof data !== 'object') {
+        console.error('[Make.com API] Invalid response structure:', data);
+        return res.status(500).json({
+          error: 'Invalid response structure from Make.com API'
+        });
+      }
+
+      const scenarioData = {
+        isActive: data.status === 'active',
+        status: data.status,
+        name: data.name,
+        nextExec: data.nextExec
+      };
+
+      res.json(scenarioData);
     } catch (error) {
-      console.error('Error fetching scenario:', error);
-      res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+      console.error('[Make.com API] Request failed:', error);
+      res.status(500).json({
+        error: 'Failed to fetch scenario status',
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
-  app.post("/api/scenarios/:scenarioId/:action", async (req, res) => {
+  // Toggle scenario status
+  app.post('/api/scenarios/:scenarioId/:action', async (req, res) => {
     try {
-      if (!MAKE_API_KEY) {
-        throw new Error("Make.com API key is not configured");
-      }
-
       const { scenarioId, action } = req.params;
+
       if (action !== 'activate' && action !== 'deactivate') {
-        return res.status(400).json({ message: 'Invalid action' });
+        return res.status(400).json({
+          error: 'Invalid action. Must be either "activate" or "deactivate"'
+        });
       }
 
-      const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`, {
+      console.log(`[Make.com API] ${action.toUpperCase()} scenario ${scenarioId}`);
+
+      // Log the full request URL and headers
+      const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`;
+      const headers = {
+        'Authorization': `Token ${MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      };
+      console.log('[Make.com API] Request details:', {
+        url,
         method: 'POST',
-        headers: {
-          'Authorization': `Token ${MAKE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
       });
 
-      const data = await response.json();
-      console.log(`Make.com API ${action} Response:`, JSON.stringify(data, null, 2));
+      const response = await fetch(url, {
+        method: 'POST',
+        headers
+      });
+
+      // Log the raw response for debugging
+      const responseText = await response.text();
+      console.log('[Make.com API] Raw response:', responseText);
 
       if (!response.ok) {
-        // Handle error responses
-        if (data.code === 'SC401') {
-          throw new Error('Invalid or expired API token. Please check your Make.com API token configuration.');
+        console.error('[Make.com API] Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseText
+        });
+
+        if (response.status === 404) {
+          return res.status(404).json({
+            error: 'Scenario not found. Please verify your scenario ID and API token permissions.'
+          });
         }
-        throw new Error(data.message || data.detail || response.statusText);
+
+        return res.status(response.status).json({
+          error: `Make.com API error: ${response.statusText}`,
+          details: responseText
+        });
       }
 
-      res.json(data);
+      // Try to parse the response as JSON if it exists
+      let data = null;
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.warn('[Make.com API] Response not JSON:', responseText);
+        }
+      }
+
+      res.json({
+        success: true,
+        action,
+        response: data
+      });
     } catch (error) {
-      console.error('Error updating scenario:', error);
-      res.status(500).json({ message: error instanceof Error ? error.message : 'Internal server error' });
+      console.error('[Make.com API] Request failed:', error);
+      res.status(500).json({
+        error: 'Failed to toggle scenario status',
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
