@@ -32,16 +32,18 @@ export function Sidebar() {
     <aside className="w-64 border-r bg-white">
       <nav className="p-4 space-y-2">
         {mainMenuItems.map((item) => (
-          <Link key={item.href} href={item.href}>
-            <a className={cn(
+          <Link 
+            key={item.href} 
+            href={item.href}
+            className={cn(
               "flex items-center space-x-3 px-3 py-2 rounded-md transition-colors",
               location === item.href 
                 ? "bg-primary text-primary-foreground" 
                 : "hover:bg-muted"
-            )}>
-              <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
-            </a>
+            )}
+          >
+            <item.icon className="h-5 w-5" />
+            <span>{item.label}</span>
           </Link>
         ))}
 
@@ -63,16 +65,18 @@ export function Sidebar() {
           {isConfigExpanded && (
             <div className="ml-4 mt-1 space-y-1">
               {configMenuItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <a className={cn(
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  className={cn(
                     "flex items-center space-x-3 px-3 py-2 rounded-md transition-colors",
                     location === item.href 
                       ? "bg-primary text-primary-foreground" 
                       : "hover:bg-muted"
-                  )}>
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </a>
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
                 </Link>
               ))}
             </div>
