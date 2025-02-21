@@ -116,7 +116,7 @@ export async function getScenarioStatus(
       );
     }
 
-    const status = {
+    const status: ScenarioStatus = {
       status: data.scenario.isActive ? "active" : "inactive",
       isActive: data.scenario.isActive,
       name: data.scenario.name,
