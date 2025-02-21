@@ -21,20 +21,47 @@ export default function CollectionsDashboardPage() {
   const [scenarioStatus, setScenarioStatus] = useState<string>("");
   const { toast } = useToast();
 
-  const { data: scenarioSettings, refetch } = useQuery<ScenarioSettings>({
+  // Query scenario settings
+  const { data: scenarioSettings, refetch, isError, error } = useQuery<ScenarioSettings>({
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
+      console.log("Fetching scenario settings...");
       const docRef = doc(db, "scenarios", "0");
       const docSnap = await getDoc(docRef);
+
       if (!docSnap.exists()) {
+        console.error("No scenario document found");
         throw new Error("Scenario settings not found");
       }
-      return docSnap.data() as ScenarioSettings;
+
+      const data = docSnap.data() as ScenarioSettings;
+      console.log("Fetched scenario settings:", data);
+
+      // Verify required fields
+      if (!data.scenarioId || !data.serviceId || !data.clientId) {
+        console.error("Missing required fields in scenario data:", data);
+        throw new Error("Invalid scenario configuration");
+      }
+
+      return data;
     }
   });
 
+  // Display error toast if query fails
+  useEffect(() => {
+    if (isError) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load scenario settings";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
+  }, [isError, error, toast]);
+
   const handleToggleService = async (checked: boolean) => {
     if (!scenarioSettings?.scenarioId) {
+      console.error("No scenario ID found. Current settings:", scenarioSettings);
       toast({
         title: "Error",
         description: "No scenario ID found",
@@ -45,6 +72,8 @@ export default function CollectionsDashboardPage() {
 
     setIsLoading(true);
     try {
+      console.log(`Toggling scenario ${scenarioSettings.scenarioId} to ${checked ? 'active' : 'inactive'}`);
+
       // Toggle the scenario in Make.com
       await toggleScenario(scenarioSettings.scenarioId, checked);
 
@@ -57,6 +86,7 @@ export default function CollectionsDashboardPage() {
       setTimeout(async () => {
         try {
           const status = await getScenarioStatus(scenarioSettings.scenarioId);
+          console.log("Updated scenario status:", status);
           setScenarioStatus(status.status);
 
           await refetch(); // Refresh the data
@@ -69,11 +99,17 @@ export default function CollectionsDashboardPage() {
           });
         } catch (error) {
           console.error("Error checking scenario status:", error);
+          toast({
+            title: "Warning",
+            description: "Could not verify scenario status",
+            variant: "destructive"
+          });
         } finally {
           setIsLoading(false);
         }
       }, 3000);
     } catch (error) {
+      console.error("Error toggling service:", error);
       toast({
         title: "Error",
         description: "Failed to update service status",
@@ -82,6 +118,24 @@ export default function CollectionsDashboardPage() {
       setIsLoading(false);
     }
   };
+
+  // Log initial scenario settings when component mounts
+  useEffect(() => {
+    console.log("Initial scenario settings:", scenarioSettings);
+  }, [scenarioSettings]);
+
+  if (isError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <h1 className="text-2xl font-bold text-red-600">Error Loading Dashboard</h1>
+          <p className="mt-2 text-gray-600">
+            Unable to load scenario settings. Please try refreshing the page.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

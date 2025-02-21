@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc, collection, enableIndexedDbPersistence } from "firebase/firestore";
+import { getFirestore, doc, setDoc, collection, enableIndexedDbPersistence, getDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 
 const firebaseConfig = {
@@ -40,6 +40,39 @@ enableIndexedDbPersistence(db)
     }
   });
 
+async function initializeScenarioData() {
+  console.log("Initializing scenario data...");
+  const scenarioRef = doc(db, "scenarios", "0");
+
+  try {
+    // Check if scenario document exists
+    const scenarioDoc = await getDoc(scenarioRef);
+    if (!scenarioDoc.exists()) {
+      console.log("Creating new scenario document...");
+      await setDoc(scenarioRef, {
+        clientId: "0",
+        serviceId: "CollectionReminders",
+        scenarioId: "3684649",
+        status: "active"
+      });
+      console.log("Scenario document created successfully");
+    } else {
+      console.log("Scenario document already exists:", scenarioDoc.data());
+      // Update the document to ensure it has the correct data
+      await setDoc(scenarioRef, {
+        clientId: "0",
+        serviceId: "CollectionReminders",
+        scenarioId: "3684649",
+        status: "active"
+      }, { merge: true });
+      console.log("Scenario document updated successfully");
+    }
+  } catch (error) {
+    console.error("Error initializing scenario data:", error);
+    throw error;
+  }
+}
+
 // Initialize the database with required data
 export async function initializeDatabase() {
   try {
@@ -51,8 +84,6 @@ export async function initializeDatabase() {
       "drahn@blueisland.ai",
       "Welcome1"
     );
-
-    console.log("Created master admin user");
 
     // Store user data in Firestore
     await setDoc(doc(db, "users", userCredential.user.uid), {
@@ -67,19 +98,19 @@ export async function initializeDatabase() {
       url: "blueisland.ai",
     });
 
-    // Create initial scenario mapping
-    await setDoc(doc(db, "scenarios", "0"), {
-      clientId: "0",
-      serviceId: "CollectionReminders",
-      scenarioId: "3684649",
-      status: "active"
-    });
-
+    await initializeScenarioData();
     console.log("Database initialized successfully");
   } catch (error) {
     console.error("Error initializing database:", error);
     if (error instanceof Error && error.message.includes('auth/email-already-in-use')) {
-      console.log("Initial user already exists, skipping initialization");
+      console.log("User already exists, ensuring scenario data is initialized...");
+      try {
+        await initializeScenarioData();
+        console.log("Scenario data initialized/updated successfully");
+      } catch (scenarioError) {
+        console.error("Error setting up scenario data:", scenarioError);
+        throw scenarioError;
+      }
       return;
     }
     throw error;
