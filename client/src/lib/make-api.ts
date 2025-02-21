@@ -34,7 +34,7 @@ export async function toggleScenario(
   activate: boolean,
 ): Promise<boolean> {
   try {
-    const action = activate ? 'activate' : 'deactivate';
+    const action = activate ? 'start' : 'stop';
     const baseUrl = "https://us1.make.com/api/v2"; // Using US1 instance
     const url = `${baseUrl}/scenarios/${scenarioId}/${action}`;
 
