@@ -4,8 +4,8 @@ import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
 import { PhoneCall, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
 import { toggleScenario, getScenarioStatus } from "@/lib/make-api";
 
@@ -26,15 +26,39 @@ export default function CollectionsDashboardPage() {
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
       console.log("Fetching scenario settings...");
-      const docRef = doc(db, "scenarios", "0");
-      const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists()) {
-        console.error("No scenario document found");
-        throw new Error("Scenario settings not found");
+      // Get current user's email
+      const currentUser = auth.currentUser;
+      if (!currentUser?.email) {
+        throw new Error("No authenticated user found");
       }
 
-      const data = docSnap.data() as ScenarioSettings;
+      // Get client document using user's email
+      const clientsRef = collection(db, "clients");
+      const clientQuery = query(clientsRef, where("username", "==", currentUser.email));
+      const clientSnapshot = await getDocs(clientQuery);
+
+      if (clientSnapshot.empty) {
+        throw new Error("No client found for current user");
+      }
+
+      const clientDoc = clientSnapshot.docs[0];
+      const clientId = clientDoc.id;
+
+      // Get scenario document using client ID
+      const scenarioQuery = query(
+        collection(db, "scenarios"),
+        where("clientId", "==", clientId),
+        where("serviceId", "==", "CollectionReminders")
+      );
+      const scenarioSnapshot = await getDocs(scenarioQuery);
+
+      if (scenarioSnapshot.empty) {
+        throw new Error("No scenario found for this client");
+      }
+
+      const scenarioDoc = scenarioSnapshot.docs[0];
+      const data = scenarioDoc.data() as ScenarioSettings;
       console.log("Fetched scenario settings:", data);
 
       // Verify required fields
@@ -78,9 +102,18 @@ export default function CollectionsDashboardPage() {
       await toggleScenario(scenarioSettings.scenarioId, checked);
 
       // Update status in Firebase
-      await updateDoc(doc(db, "scenarios", "0"), {
-        status: checked ? "active" : "inactive"
-      });
+      const scenarioQuery = query(
+        collection(db, "scenarios"),
+        where("clientId", "==", scenarioSettings.clientId),
+        where("serviceId", "==", "CollectionReminders")
+      );
+      const scenarioSnapshot = await getDocs(scenarioQuery);
+
+      if (!scenarioSnapshot.empty) {
+        await updateDoc(doc(db, "scenarios", scenarioSnapshot.docs[0].id), {
+          status: checked ? "active" : "inactive"
+        });
+      }
 
       // Wait 3 seconds and check status
       setTimeout(async () => {
