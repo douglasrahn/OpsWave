@@ -162,7 +162,6 @@ export default function CollectionsDashboardPage() {
             setScenarioStatus(status.status);
 
             await refetch(); // Refresh the data
-
             toast({
               title: checked ? "Service Resumed" : "Service Paused",
               description: checked 
@@ -204,7 +203,14 @@ export default function CollectionsDashboardPage() {
         <div className="p-6">
           <h1 className="text-2xl font-bold text-red-600">Error Loading Dashboard</h1>
           <p className="mt-2 text-gray-600">
-            Unable to load scenario settings. Please try refreshing the page.
+            {error instanceof Error && error.message.includes("API token") 
+              ? "Unable to connect to Make.com. Please check your API token configuration."
+              : "Unable to load scenario settings. Please try refreshing the page."}
+          </p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            If this issue persists, please contact support with the following error details:
+            <br />
+            {error instanceof Error ? error.message : "Unknown error"}
           </p>
         </div>
       </DashboardLayout>
