@@ -6,9 +6,6 @@ const MAKE_API_KEY = process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = "https://us1.make.com/api/v2";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
-
   app.get("/api/scenarios/:scenarioId", async (req, res) => {
     try {
       const { scenarioId } = req.params;
@@ -21,6 +18,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const data = await response.json();
+
+      // Log the raw response for debugging
+      console.log('Make.com API Response:', JSON.stringify(data, null, 2));
+
+      if (!data.scenario) {
+        throw new Error('Invalid response format from Make.com API');
+      }
+
       res.json(data);
     } catch (error) {
       console.error('Error fetching scenario:', error);
@@ -44,6 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const data = await response.json();
+      console.log(`Make.com API ${action} Response:`, JSON.stringify(data, null, 2));
       res.json(data);
     } catch (error) {
       console.error('Error updating scenario:', error);

@@ -33,7 +33,11 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
   try {
     const action = activate ? 'activate' : 'deactivate';
     const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
-    const data = await response.json();
+    const data: MakeApiResponse = await response.json();
+
+    // Log the parsed response for debugging
+    console.log('Toggle scenario response:', data);
+
     return true;
   } catch (error) {
     console.error('Error toggling scenario:', error);
@@ -45,6 +49,9 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioSta
   try {
     const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`);
     const data: MakeApiResponse = await response.json();
+
+    // Log the parsed response for debugging
+    console.log('Get scenario status response:', data);
 
     if (!data?.scenario) {
       console.error('Invalid scenario data format:', data);
