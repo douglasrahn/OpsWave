@@ -31,21 +31,6 @@ interface MakeApiResponse {
 
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<boolean> {
   try {
-    // First get the current status to verify the intended action
-    const currentStatus = await getScenarioStatus(scenarioId);
-    console.log('[Make.com API] Current scenario status before toggle:', currentStatus);
-
-    // Check if the scenario is in a valid state for toggling
-    if (currentStatus.status === 'error') {
-      throw new Error('Cannot toggle scenario: Current status is invalid');
-    }
-
-    // Only proceed if the current status actually needs to change
-    if (currentStatus.isActive === activate) {
-      console.log(`[Make.com API] Scenario is already ${activate ? 'active' : 'inactive'}`);
-      return true;
-    }
-
     const action = activate ? 'activate' : 'deactivate';
     console.log(`[Make.com API] Sending ${action} request for scenario ${scenarioId}`);
 
@@ -65,21 +50,6 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 
       const data: MakeApiResponse = await response.json();
       console.log('[Make.com API] Toggle response:', data);
-
-      // Add delay before checking status if we're deactivating
-      if (!activate) {
-        console.log('[Make.com API] Waiting 5 seconds before checking deactivated status...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-
-      // Verify the toggle was successful
-      const updatedStatus = await getScenarioStatus(scenarioId);
-      console.log('[Make.com API] Status after toggle:', updatedStatus);
-
-      // Ensure the status matches our intended state
-      if (updatedStatus.isActive !== activate) {
-        throw new Error(`Failed to ${action} scenario. Status remains ${updatedStatus.status}`);
-      }
 
       return true;
     } catch (error) {

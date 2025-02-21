@@ -1,13 +1,14 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
-import { PhoneCall, Clock, Loader2 } from "lucide-react";
+import { PhoneCall, Clock, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
-import { toggleScenario, getScenarioStatus } from "@/lib/make-api";
+import { toggleScenario } from "@/lib/make-api";
 import { getCurrentClientId } from "@/lib/auth";
 import { useLocation } from "wouter";
 
@@ -20,14 +21,13 @@ interface ScenarioSettings {
   nextExec?: string;
 }
 
-// Add this validation function at the top of the file
 function isValidScenarioId(id: string): boolean {
-  // Make.com scenario IDs are typically numeric
   return /^\d+$/.test(id);
 }
 
 export default function CollectionsDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
 
@@ -68,8 +68,26 @@ export default function CollectionsDashboardPage() {
     }
   });
 
+  const handleRefreshStatus = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast({
+        title: "Status Updated",
+        description: "Scenario status has been refreshed"
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to refresh status";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
-  // Handle toggle service
   const handleToggleService = async (checked: boolean) => {
     if (!scenarioSettings?.scenarioId) {
       console.error("[Dashboard] No scenario ID found. Current settings:", scenarioSettings);
@@ -116,8 +134,7 @@ export default function CollectionsDashboardPage() {
           });
         }
 
-        // Refresh the data
-        await refetch();
+        // Update UI with the new toggle state
 
         toast({
           title: checked ? "Service Resumed" : "Service Paused",
@@ -217,11 +234,20 @@ export default function CollectionsDashboardPage() {
       <Card className="mb-8">
         <CardContent className="pt-6">
           <div className="flex flex-col items-center space-y-4">
-            <h2 className="text-xl font-semibold">
-              {scenarioSettings?.name || "AI Calling Agent"}
-            </h2>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-semibold">
+                {scenarioSettings?.name || "AI Calling Agent"}
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefreshStatus}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
             <div className="flex items-center space-x-4">
-              {/*isStatusLoading is removed as the loading state is handled within handleToggleService*/}
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -252,7 +278,6 @@ export default function CollectionsDashboardPage() {
                 Next execution: {new Date(scenarioSettings.nextExec).toLocaleString()}
               </p>
             )}
-            {/*scenarioStatus is removed as it's redundant with scenarioSettings.status*/}
           </div>
         </CardContent>
       </Card>
