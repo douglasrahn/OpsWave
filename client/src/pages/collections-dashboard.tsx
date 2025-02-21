@@ -12,6 +12,7 @@ import { toggleScenario, getScenarioStatus, type ScenarioResponse } from "@/lib/
 import { getCurrentClientId } from "@/lib/auth";
 import { useLocation } from "wouter";
 
+// Only store configuration, no status
 interface ScenarioSettings {
   clientId: string;
   serviceId: string;
@@ -43,6 +44,7 @@ export default function CollectionsDashboardPage() {
         throw new Error("Please log in again");
       }
 
+      // Only fetch configuration from Firebase
       const scenarioQuery = query(
         collection(db, "scenarios"),
         where("clientId", "==", clientId),
@@ -54,17 +56,23 @@ export default function CollectionsDashboardPage() {
         throw new Error("No scenario found for this client");
       }
 
-      const settings = scenarioSnapshot.docs[0].data() as ScenarioSettings;
-      console.log("[Dashboard] Fetched scenario data:", settings);
+      // Extract only the configuration fields
+      const settings = {
+        clientId,
+        serviceId: "CollectionReminders",
+        scenarioId: scenarioSnapshot.docs[0].data().scenarioId
+      } as ScenarioSettings;
 
-      if (!settings.scenarioId || !settings.serviceId || !settings.clientId) {
-        console.error("[Dashboard] Missing required fields in scenario data:", settings);
+      console.log("[Dashboard] Fetched scenario config:", settings);
+
+      if (!settings.scenarioId) {
+        console.error("[Dashboard] Missing scenario ID in config:", settings);
         throw new Error("Invalid scenario configuration");
       }
 
       // Get live status from Make.com API
       const status = await getScenarioStatus(settings.scenarioId);
-      console.log("[Dashboard] Make.com status:", status);
+      console.log("[Dashboard] Make.com API status:", status);
 
       return { settings, status };
     },
