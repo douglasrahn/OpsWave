@@ -1,11 +1,14 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProductCard } from "@/components/dashboard/ProductCard";
+import { useLocation } from "wouter";
 
 export default function DashboardPage() {
+  const [_, setLocation] = useLocation();
+
   return (
     <DashboardLayout>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Welcome to OpWave</h1>
+        <h1 className="text-3xl font-bold">Welcome to OpsWave</h1>
         <p className="text-muted-foreground mt-2">
           Manage your automation tools and settings
         </p>
@@ -15,7 +18,7 @@ export default function DashboardPage() {
         <ProductCard
           title="Collection Reminders"
           description="Automate and manage collection reminders"
-          onClick={() => {/* Navigate to product */}}
+          onClick={() => setLocation("/collections-dashboard")}
         />
         <ProductCard
           title="Collection Handling"

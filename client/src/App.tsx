@@ -10,6 +10,7 @@ import DashboardPage from "@/pages/dashboard";
 import UsersPage from "@/pages/users";
 import SubscriptionsPage from "@/pages/subscriptions";
 import CollectionsConfigPage from "@/pages/config/collections";
+import CollectionsDashboardPage from "@/pages/collections-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/users" component={UsersPage} />
       <Route path="/subscriptions" component={SubscriptionsPage} />
       <Route path="/config/collections" component={CollectionsConfigPage} />
+      <Route path="/collections-dashboard" component={CollectionsDashboardPage} />
       <Route component={NotFound} />
     </Switch>
   );
