@@ -96,6 +96,7 @@ export async function initializeDatabase() {
     await setDoc(doc(db, "clients", "0"), {
       companyName: "BlueIsland",
       url: "blueisland.ai",
+      email: "drahn@blueisland.ai"  // Add email field here
     });
 
     await initializeScenarioData();
@@ -103,13 +104,19 @@ export async function initializeDatabase() {
   } catch (error) {
     console.error("Error initializing database:", error);
     if (error instanceof Error && error.message.includes('auth/email-already-in-use')) {
-      console.log("User already exists, ensuring scenario data is initialized...");
+      console.log("User already exists, ensuring client data is initialized...");
       try {
+        // Update client data to ensure email field exists
+        await setDoc(doc(db, "clients", "0"), {
+          companyName: "BlueIsland",
+          url: "blueisland.ai",
+          email: "drahn@blueisland.ai"
+        }, { merge: true });
         await initializeScenarioData();
-        console.log("Scenario data initialized/updated successfully");
-      } catch (scenarioError) {
-        console.error("Error setting up scenario data:", scenarioError);
-        throw scenarioError;
+        console.log("Data initialized/updated successfully");
+      } catch (updateError) {
+        console.error("Error updating data:", updateError);
+        throw updateError;
       }
       return;
     }
