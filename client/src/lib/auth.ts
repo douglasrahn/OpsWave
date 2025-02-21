@@ -6,9 +6,15 @@ export async function loginUser(email: string, password: string) {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+    if (!userDoc.exists()) {
+      throw new Error("User data not found");
+    }
     return userDoc.data();
   } catch (error: unknown) {
     if (error instanceof Error) {
+      if (error.message.includes("offline")) {
+        throw new Error("Unable to connect to the server. Please check your internet connection.");
+      }
       throw new Error(error.message);
     }
     throw new Error("An unknown error occurred");
