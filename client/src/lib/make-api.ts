@@ -49,7 +49,12 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
     console.log(`Toggling scenario ${scenarioId} to ${action}`);
 
     try {
-      const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
+      const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`, {
+        headers: {
+          'Authorization': `Token ${import.meta.env.VITE_MAKE_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -85,7 +90,18 @@ export async function toggleScenario(scenarioId: string, activate: boolean): Pro
 
 export async function getScenarioStatus(scenarioId: string): Promise<ScenarioStatus> {
   try {
-    const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`);
+    const response = await apiRequest('GET', `/api/scenarios/${scenarioId}`, {
+      headers: {
+        'Authorization': `Token ${import.meta.env.VITE_MAKE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get scenario status');
+    }
+
     const data: MakeApiResponse = await response.json();
 
     // Log the parsed response for debugging
