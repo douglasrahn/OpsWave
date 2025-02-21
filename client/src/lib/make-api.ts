@@ -9,21 +9,25 @@ const errorResponseSchema = z.object({
 
 // Success response schema for scenario endpoints
 const scenarioResponseSchema = z.object({
-  scenario: z.object({
-    id: z.string(),
-    name: z.string(),
-    isActive: z.boolean(),
-    status: z.enum(['active', 'inactive', 'error']),
-    isPaused: z.boolean().optional(),
-    nextExec: z.string().optional(),
-    scheduling: z.object({
-      type: z.string(),
-      interval: z.number().optional(),
-    }).optional(),
-  })
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(['active', 'inactive', 'error']),
+  lastExecution: z.string().optional(),
+  nextExec: z.string().optional(),
+  type: z.string(),
+  scheduling: z.object({
+    type: z.string(),
+    interval: z.number().optional(),
+  }).optional(),
+  execution: z.object({
+    mode: z.string(),
+    period: z.string().optional(),
+  }).optional(),
+  teamId: z.string(),
+  folderId: z.string(),
 });
 
-type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
+export type ScenarioResponse = z.infer<typeof scenarioResponseSchema>;
 
 /**
  * Makes an authenticated request to the Make.com API through our backend proxy
@@ -82,7 +86,7 @@ export async function getScenarioStatus(scenarioId: string): Promise<ScenarioRes
  */
 export async function startScenario(scenarioId: string): Promise<ScenarioResponse> {
   const status = await getScenarioStatus(scenarioId);
-  if (status.scenario.status === 'active') {
+  if (status.status === 'active') {
     console.log('[Make.com API] Scenario is already active, skipping start request');
     return status;
   }
@@ -94,7 +98,7 @@ export async function startScenario(scenarioId: string): Promise<ScenarioRespons
  */
 export async function stopScenario(scenarioId: string): Promise<ScenarioResponse> {
   const status = await getScenarioStatus(scenarioId);
-  if (status.scenario.status !== 'active') {
+  if (status.status !== 'active') {
     console.log('[Make.com API] Scenario is not active, skipping stop request');
     return status;
   }

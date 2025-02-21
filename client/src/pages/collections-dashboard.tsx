@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
-import { toggleScenario } from "@/lib/make-api";
+import { toggleScenario, getScenarioStatus, type ScenarioResponse } from "@/lib/make-api";
 import { getCurrentClientId } from "@/lib/auth";
 import { useLocation } from "wouter";
 
@@ -19,16 +19,6 @@ interface ScenarioSettings {
   status: string;
   name?: string;
   nextExec?: string;
-}
-
-async function getScenarioStatus(scenarioId: string): Promise<{scenario: {status: string, name: string, nextExec: string}}> {
-  // Replace with your actual API call to get scenario status
-  // This is a placeholder, adapt to your actual API
-  const response = await fetch(`/api/scenario/${scenarioId}/status`);
-  if (!response.ok) {
-    throw new Error(`Make.com API request failed with status ${response.status}`);
-  }
-  return response.json();
 }
 
 function isValidScenarioId(id: string): boolean {
@@ -79,9 +69,9 @@ export default function CollectionsDashboardPage() {
         console.log("[Dashboard] Make.com status:", makeStatus);
 
         // Update status if it doesn't match
-        if (makeStatus.scenario.status === 'active' && scenarioData.status !== 'active' ||
-            makeStatus.scenario.status !== 'active' && scenarioData.status === 'active') {
-          const newStatus = makeStatus.scenario.status === 'active' ? 'active' : 'inactive';
+        if (makeStatus.status === 'active' && scenarioData.status !== 'active' ||
+            makeStatus.status !== 'active' && scenarioData.status === 'active') {
+          const newStatus = makeStatus.status === 'active' ? 'active' : 'inactive';
           console.log(`[Dashboard] Updating Firebase status to match Make.com: ${newStatus}`);
           await updateDoc(doc(db, "scenarios", scenarioDoc.id), {
             status: newStatus
@@ -90,8 +80,8 @@ export default function CollectionsDashboardPage() {
         }
 
         // Include additional Make.com data
-        scenarioData.name = makeStatus.scenario.name;
-        scenarioData.nextExec = makeStatus.scenario.nextExec;
+        scenarioData.name = makeStatus.name;
+        scenarioData.nextExec = makeStatus.nextExec;
       } catch (error) {
         console.error("[Dashboard] Error fetching Make.com status:", error);
         // Continue with Firebase data if Make.com API fails
