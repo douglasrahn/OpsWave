@@ -31,12 +31,29 @@ interface MakeApiResponse {
 
 export async function toggleScenario(scenarioId: string, activate: boolean): Promise<boolean> {
   try {
+    // First get the current status to verify the intended action
+    const currentStatus = await getScenarioStatus(scenarioId);
+
+    // Only proceed if the current status matches our intent to change
+    if (currentStatus.isActive === activate) {
+      console.log(`Scenario is already ${activate ? 'active' : 'inactive'}`);
+      return true;
+    }
+
     const action = activate ? 'activate' : 'deactivate';
+    console.log(`Toggling scenario ${scenarioId} to ${action}`);
+
     const response = await apiRequest('POST', `/api/scenarios/${scenarioId}/${action}`);
     const data: MakeApiResponse = await response.json();
 
     // Log the parsed response for debugging
     console.log('Toggle scenario response:', data);
+
+    // Verify the toggle was successful
+    const updatedStatus = await getScenarioStatus(scenarioId);
+    if (updatedStatus.isActive !== activate) {
+      throw new Error(`Failed to ${action} scenario. Status remains ${updatedStatus.status}`);
+    }
 
     return true;
   } catch (error) {

@@ -8,6 +8,10 @@ const MAKE_API_BASE_URL = "https://us1.make.com/api/v2";
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/scenarios/:scenarioId", async (req, res) => {
     try {
+      if (!MAKE_API_KEY) {
+        throw new Error("Make.com API key is not configured");
+      }
+
       const { scenarioId } = req.params;
       const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, {
         method: 'GET',
@@ -22,6 +26,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the raw response for debugging
       console.log('Make.com API Response:', JSON.stringify(data, null, 2));
 
+      if (!response.ok) {
+        // Handle error responses
+        if (data.code === 'SC401') {
+          throw new Error('Invalid or expired API token. Please check your Make.com API token configuration.');
+        }
+        throw new Error(data.message || data.detail || response.statusText);
+      }
+
       if (!data.scenario) {
         throw new Error('Invalid response format from Make.com API');
       }
@@ -35,6 +47,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/scenarios/:scenarioId/:action", async (req, res) => {
     try {
+      if (!MAKE_API_KEY) {
+        throw new Error("Make.com API key is not configured");
+      }
+
       const { scenarioId, action } = req.params;
       if (action !== 'activate' && action !== 'deactivate') {
         return res.status(400).json({ message: 'Invalid action' });
@@ -50,6 +66,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = await response.json();
       console.log(`Make.com API ${action} Response:`, JSON.stringify(data, null, 2));
+
+      if (!response.ok) {
+        // Handle error responses
+        if (data.code === 'SC401') {
+          throw new Error('Invalid or expired API token. Please check your Make.com API token configuration.');
+        }
+        throw new Error(data.message || data.detail || response.statusText);
+      }
+
       res.json(data);
     } catch (error) {
       console.error('Error updating scenario:', error);
