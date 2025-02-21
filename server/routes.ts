@@ -18,11 +18,11 @@ export function registerRoutes(app: Express): Server {
         'Content-Type': 'application/json'
       };
 
-      // Log the full request details (with redacted token)
+      // Log the full request details
       console.log('[Make.com API] Request details:', {
         url,
         method: 'GET',
-        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
+        headers
       });
 
       const response = await fetch(url, { headers });
@@ -80,11 +80,11 @@ export function registerRoutes(app: Express): Server {
         'Content-Type': 'application/json'
       };
 
-      // Log the full request details (with redacted token)
+      // Log the full request details
       console.log('[Make.com API] Request details:', {
         url,
         method: 'POST',
-        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
+        headers
       });
 
       const response = await fetch(url, {

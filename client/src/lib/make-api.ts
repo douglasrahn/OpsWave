@@ -34,13 +34,15 @@ async function makeRequest(endpoint: string, options: RequestInit = {}): Promise
     console.log(`[Make.com API] Making ${method} request:`, {
       url: endpoint,
       method,
-      headers: options.headers || {},
+      headers: options.headers,
+      options
     });
 
     const response = await fetch(endpoint, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...options.headers
       },
     });
 
