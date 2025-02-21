@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import express from 'express';
 import fetch from 'node-fetch';
 
 const MAKE_API_KEY = process.env.MAKE_API_KEY;
@@ -13,79 +12,56 @@ export function registerRoutes(app: Express): Server {
       const { scenarioId } = req.params;
       console.log(`[Make.com API] Getting status for scenario ${scenarioId}`);
 
-      // Log the full request URL and headers
       const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
       const headers = {
         'Authorization': `Token ${MAKE_API_KEY}`,
         'Content-Type': 'application/json'
       };
-      console.log('[Make.com API] Request details:', {
-        url,
-        method: 'GET',
-        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
-      });
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers
-      });
-
-      // Log the raw response for debugging
-      const responseText = await response.text();
-      console.log('[Make.com API] Raw response:', responseText);
+      const response = await fetch(url, { headers });
+      const data = await response.json();
 
       if (!response.ok) {
-        console.error('[Make.com API] Error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: responseText
-        });
-
-        if (response.status === 404) {
-          return res.status(404).json({
-            error: 'Scenario not found. Please verify your scenario ID and API token permissions.'
-          });
-        }
-
         return res.status(response.status).json({
-          error: `Make.com API error: ${response.statusText}`,
-          details: responseText
+          error: data.message || 'Failed to fetch scenario status'
         });
       }
 
-      // Parse the response text as JSON
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('[Make.com API] Failed to parse response as JSON:', parseError);
-        return res.status(500).json({
-          error: 'Invalid response format from Make.com API',
-          details: responseText
-        });
-      }
-
-      // Validate and transform the response
-      if (!data || typeof data !== 'object') {
-        console.error('[Make.com API] Invalid response structure:', data);
-        return res.status(500).json({
-          error: 'Invalid response structure from Make.com API'
-        });
-      }
-
-      const scenarioData = {
-        isActive: data.status === 'active',
-        status: data.status,
-        name: data.name,
-        nextExec: data.nextExec
+      // Transform the Make.com response to match our frontend schema
+      const transformedData = {
+        scenario: {
+          id: data.id,
+          name: data.name,
+          teamId: data.teamId,
+          isActive: data.status === 'active',
+          isPaused: data.status === 'suspended',
+          hookId: data.hookId,
+          deviceId: data.deviceId,
+          deviceScope: data.deviceScope,
+          concept: data.concept,
+          description: data.description || '',
+          folderId: data.folderId,
+          slots: data.slots,
+          isinvalid: data.isinvalid || false,
+          islinked: data.islinked || false,
+          islocked: data.islocked || false,
+          usedPackages: data.usedPackages || [],
+          lastEdit: data.lastEdit,
+          scheduling: data.scheduling || { type: 'manual' },
+          iswaiting: data.iswaiting || false,
+          dlqCount: data.dlqCount || 0,
+          allDlqCount: data.allDlqCount || 0,
+          nextExec: data.nextExec,
+          created: data.created,
+          chainingRole: data.chainingRole || 'none'
+        }
       };
 
-      res.json(scenarioData);
+      res.json(transformedData);
     } catch (error) {
       console.error('[Make.com API] Request failed:', error);
       res.status(500).json({
-        error: 'Failed to fetch scenario status',
-        details: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : 'Internal server error'
       });
     }
   });
@@ -101,68 +77,63 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      console.log(`[Make.com API] ${action.toUpperCase()} scenario ${scenarioId}`);
-
-      // Log the full request URL and headers
       const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`;
       const headers = {
         'Authorization': `Token ${MAKE_API_KEY}`,
         'Content-Type': 'application/json'
       };
-      console.log('[Make.com API] Request details:', {
-        url,
-        method: 'POST',
-        headers: { ...headers, 'Authorization': 'Token [REDACTED]' }
-      });
 
       const response = await fetch(url, {
         method: 'POST',
         headers
       });
 
-      // Log the raw response for debugging
-      const responseText = await response.text();
-      console.log('[Make.com API] Raw response:', responseText);
+      const data = await response.json();
 
       if (!response.ok) {
-        console.error('[Make.com API] Error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: responseText
-        });
-
-        if (response.status === 404) {
-          return res.status(404).json({
-            error: 'Scenario not found. Please verify your scenario ID and API token permissions.'
-          });
-        }
-
         return res.status(response.status).json({
-          error: `Make.com API error: ${response.statusText}`,
-          details: responseText
+          error: data.message || `Failed to ${action} scenario`
         });
       }
 
-      // Try to parse the response as JSON if it exists
-      let data = null;
-      if (responseText) {
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.warn('[Make.com API] Response not JSON:', responseText);
-        }
-      }
+      // Get updated scenario status
+      const statusResponse = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, { headers });
+      const statusData = await statusResponse.json();
 
-      res.json({
-        success: true,
-        action,
-        response: data
-      });
+      const transformedData = {
+        scenario: {
+          id: statusData.id,
+          name: statusData.name,
+          teamId: statusData.teamId,
+          isActive: statusData.status === 'active',
+          isPaused: statusData.status === 'suspended',
+          hookId: statusData.hookId,
+          deviceId: statusData.deviceId,
+          deviceScope: statusData.deviceScope,
+          concept: statusData.concept,
+          description: statusData.description || '',
+          folderId: statusData.folderId,
+          slots: statusData.slots,
+          isinvalid: statusData.isinvalid || false,
+          islinked: statusData.islinked || false,
+          islocked: statusData.islocked || false,
+          usedPackages: statusData.usedPackages || [],
+          lastEdit: statusData.lastEdit,
+          scheduling: statusData.scheduling || { type: 'manual' },
+          iswaiting: statusData.iswaiting || false,
+          dlqCount: statusData.dlqCount || 0,
+          allDlqCount: statusData.allDlqCount || 0,
+          nextExec: statusData.nextExec,
+          created: statusData.created,
+          chainingRole: statusData.chainingRole || 'none'
+        }
+      };
+
+      res.json(transformedData);
     } catch (error) {
       console.error('[Make.com API] Request failed:', error);
       res.status(500).json({
-        error: 'Failed to toggle scenario status',
-        details: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : 'Internal server error'
       });
     }
   });
