@@ -22,14 +22,17 @@ app.use((req, res, next) => {
 let server: Server | null = null;
 
 // Function to check if a port is in use
-const isPortInUse = (port: number): Promise<boolean> => {
+const isPortInUse = async (port: number): Promise<boolean> => {
+  log(`[Server] Checking if port ${port} is in use...`);
   return new Promise((resolve) => {
     const tester = createServer()
       .once('error', () => {
+        log(`[Server] Port ${port} is in use`);
         resolve(true);
       })
       .once('listening', () => {
         tester.once('close', () => {
+          log(`[Server] Port ${port} is available`);
           resolve(false);
         }).close();
       })
@@ -37,20 +40,45 @@ const isPortInUse = (port: number): Promise<boolean> => {
   });
 };
 
+// Function to wait for port to be available
+const waitForPort = async (port: number, maxAttempts = 5): Promise<void> => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    log(`[Server] Attempt ${attempt}/${maxAttempts} to wait for port ${port}`);
+    const inUse = await isPortInUse(port);
+    if (!inUse) return;
+    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+    log(`[Server] Waiting ${delay}ms before next attempt`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  throw new Error(`Port ${port} is still in use after ${maxAttempts} attempts`);
+};
+
+// Function to gracefully shutdown server
+const shutdownServer = async (): Promise<void> => {
+  if (server) {
+    log("[Server] Initiating graceful shutdown...");
+    return new Promise<void>((resolve) => {
+      server!.close(() => {
+        log("[Server] Server closed successfully");
+        server = null;
+        resolve();
+      });
+    });
+  }
+  log("[Server] No server instance to shutdown");
+  return Promise.resolve();
+};
+
 const startServer = async () => {
   try {
+    log("[Server] Initial startup sequence beginning...");
     log("[Server] Starting server initialization...");
 
-    // If there's an existing server, close it properly
-    if (server) {
-      log("[Server] Closing existing server instance...");
-      await new Promise<void>((resolve) => {
-        server!.close(() => {
-          server = null;
-          resolve();
-        });
-      });
-    }
+    // Ensure any existing server is properly shutdown
+    await shutdownServer();
+
+    const PORT = 5000;
+    await waitForPort(PORT);
 
     log("[Server] Registering routes...");
     server = registerRoutes(app);
@@ -62,16 +90,6 @@ const startServer = async () => {
       log(`[Server] Error handler caught: ${message}`);
       res.status(status).json({ message });
     });
-
-    const PORT = 5000;
-
-    // Check if port is in use
-    const portInUse = await isPortInUse(PORT);
-    if (portInUse) {
-      log(`[Server] Port ${PORT} is already in use. Waiting for it to be available...`);
-      // Wait a bit and try again
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
 
     // Setup Vite or static serving based on environment
     if (app.get("env") === "development") {
@@ -101,33 +119,24 @@ const startServer = async () => {
 
   } catch (error) {
     log(`[Server] Failed to start server: ${error}`);
-    if (server) {
-      server.close();
-      server = null;
-    }
+    await shutdownServer();
     process.exit(1);
   }
 };
 
 // Handle cleanup on process termination
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   log('[Server] Received SIGTERM signal');
-  if (server) {
-    server.close(() => {
-      log('[Server] Server gracefully terminated');
-      process.exit(0);
-    });
-  }
+  await shutdownServer();
+  log('[Server] Server gracefully terminated');
+  process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   log('[Server] Received SIGINT signal');
-  if (server) {
-    server.close(() => {
-      log('[Server] Server gracefully terminated');
-      process.exit(0);
-    });
-  }
+  await shutdownServer();
+  log('[Server] Server gracefully terminated');
+  process.exit(0);
 });
 
 log('[Server] Initial startup sequence beginning...');
