@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 
 // List of available Firebase tables
 const TABLES = [
+  { id: "campaigns", name: "Campaigns", icon: Database },
   { id: "clients", name: "Clients", icon: Database },
   { id: "scenarios", name: "Scenarios", icon: Database },
   { id: "users", name: "Users", icon: Database }

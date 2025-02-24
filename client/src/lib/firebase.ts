@@ -14,6 +14,7 @@ const firebaseConfig = {
 const requiredConfigs = ['apiKey', 'authDomain', 'projectId', 'appId'];
 for (const config of requiredConfigs) {
   if (!firebaseConfig[config as keyof typeof firebaseConfig]) {
+    console.error(`Missing required Firebase configuration: ${config}`);
     throw new Error(`Missing required Firebase configuration: ${config}`);
   }
 }
@@ -28,9 +29,9 @@ export const auth = getAuth(app);
 
 // Initialize Firestore with persistent cache
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(
-    { tabManager: persistentSingleTabManager() }
-  )
+  localCache: persistentLocalCache({
+    tabManager: persistentSingleTabManager({}) 
+  })
 });
 
 // Initialize the database with basic configuration only

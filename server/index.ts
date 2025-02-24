@@ -38,23 +38,30 @@ async function startServer() {
       res.status(500).json({ error: 'Internal Server Error' });
     });
 
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running at http://0.0.0.0:${PORT}`);
-    }).on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${PORT} is already in use. Trying to close existing connection...`);
-        setTimeout(() => {
-          server.close();
-          server.listen(PORT, '0.0.0.0');
-        }, 1000);
-      } else {
-        console.error('Server failed to start:', err);
-        process.exit(1);
-      }
+    // Wrap server.listen in a promise to handle both success and failure
+    await new Promise<void>((resolve, reject) => {
+      console.log(`Attempting to start server on port ${PORT}...`);
+
+      server.listen(PORT, '0.0.0.0')
+        .once('listening', () => {
+          console.log(`Server running at http://0.0.0.0:${PORT}`);
+          resolve();
+        })
+        .once('error', (err: any) => {
+          if (err.code === 'EADDRINUSE') {
+            console.error(`Port ${PORT} is already in use. Attempting to close existing connection...`);
+            server.close();
+            server.listen(PORT, '0.0.0.0');
+          } else {
+            console.error('Server failed to start:', err);
+            reject(err);
+          }
+        });
     });
 
   } catch (error) {
     console.error('Failed to start server:', error);
+    // Exit with error code to trigger workflow restart
     process.exit(1);
   }
 }

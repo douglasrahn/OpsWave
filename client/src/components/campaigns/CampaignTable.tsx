@@ -11,10 +11,10 @@ import { format } from "date-fns";
 interface Campaign {
   id: string;
   campaignName: string;
-  companyName: string;
-  contactFirstName: string | null;
-  contactLastName: string | null;
-  pastDueAmount: number | null;
+  companyName?: string;
+  contactFirstName?: string | null;
+  contactLastName?: string | null;
+  pastDueAmount?: number | null;
   createdAt: string;
 }
 
@@ -23,6 +23,14 @@ interface CampaignTableProps {
 }
 
 export function CampaignTable({ campaigns }: CampaignTableProps) {
+  if (campaigns.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No campaigns found. Create a new campaign to get started.
+      </div>
+    );
+  }
+
   return (
     <Table>
       <TableHeader>
@@ -37,20 +45,20 @@ export function CampaignTable({ campaigns }: CampaignTableProps) {
       <TableBody>
         {campaigns.map((campaign) => (
           <TableRow key={campaign.id}>
-            <TableCell>{campaign.campaignName}</TableCell>
-            <TableCell>{campaign.companyName || 'N/A'}</TableCell>
+            <TableCell className="font-medium">{campaign.campaignName}</TableCell>
+            <TableCell>{campaign.companyName || 'Not Set'}</TableCell>
             <TableCell>
               {campaign.contactFirstName || campaign.contactLastName 
-                ? `${campaign.contactFirstName || ''} ${campaign.contactLastName || ''}`
-                : 'N/A'}
+                ? `${campaign.contactFirstName || ''} ${campaign.contactLastName || ''}`.trim()
+                : 'Not Set'}
             </TableCell>
             <TableCell>
-              {campaign.pastDueAmount !== null 
+              {campaign.pastDueAmount != null 
                 ? `$${campaign.pastDueAmount.toFixed(2)}`
-                : 'N/A'}
+                : 'Not Set'}
             </TableCell>
             <TableCell>
-              {campaign.createdAt ? format(new Date(campaign.createdAt), 'MMM d, yyyy') : 'N/A'}
+              {format(new Date(campaign.createdAt), 'MMM d, yyyy')}
             </TableCell>
           </TableRow>
         ))}
