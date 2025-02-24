@@ -4,8 +4,9 @@ import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getCurrentClientId } from "@/lib/auth";
 
 // List of available Firebase tables with improved metadata
 const TABLES = [
@@ -44,11 +45,29 @@ export default function RawDataPage() {
   const fetchTableData = async (tableName: string) => {
     setIsLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, tableName));
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const clientId = getCurrentClientId();
+      if (!clientId) {
+        throw new Error("No client ID found");
+      }
+
+      let data: any[] = [];
+
+      if (tableName === 'campaign_entries') {
+        // Use collectionGroup to query all entries across all campaigns for this client
+        const entriesQuery = query(collectionGroup(db, 'entries'));
+        const querySnapshot = await getDocs(entriesQuery);
+        data = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } else {
+        const querySnapshot = await getDocs(collection(db, tableName));
+        data = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+
       setTableData(data);
       setSelectedTable(tableName);
     } catch (error) {
@@ -79,7 +98,7 @@ export default function RawDataPage() {
       </div>
 
       {!selectedTable ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {TABLES.map(table => (
             <Card
               key={table.id}

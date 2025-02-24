@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getCurrentClientId } from "@/lib/auth";
 
 interface TableEditorProps {
   tableName: string;
@@ -18,9 +19,9 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
-  // Get header fields from the first row of data
+  // Get header fields from the first row of data, excluding internal fields
   const headers = data.length > 0 
-    ? Object.keys(data[0]).filter(key => key !== 'id')
+    ? Object.keys(data[0]).filter(key => !['id', 'clientId'].includes(key))
     : [];
 
   const handleEdit = (row: Record<string, any>) => {
@@ -35,9 +36,26 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleSave = async (id: string) => {
     try {
-      const docRef = doc(db, tableName, id);
+      const clientId = getCurrentClientId();
+      if (!clientId) {
+        throw new Error("No client ID found");
+      }
+
+      let docRef;
+      if (tableName === 'campaign_entries') {
+        // Find the campaign ID from the data
+        const entry = data.find(entry => entry.id === id);
+        if (!entry?.campaignId) {
+          throw new Error("Campaign ID not found");
+        }
+        docRef = doc(db, `clients/${clientId}/campaigns/${entry.campaignId}/entries`, id);
+      } else {
+        docRef = doc(db, tableName, id);
+      }
+
       const updateData = { ...editedData };
       delete updateData.id; // Remove id from update data
+      updateData.updatedAt = new Date().toISOString();
 
       await updateDoc(docRef, updateData);
 
@@ -68,7 +86,6 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   // Format field names for display
   const formatFieldName = (field: string) => {
-    // Convert camelCase to Title Case with spaces
     return field
       .replace(/([A-Z])/g, ' $1')
       .replace(/^./, str => str.toUpperCase())
