@@ -35,46 +35,74 @@ export default function CollectionsDashboardPage() {
   }>({
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
-      console.log("[Dashboard] Fetching scenario settings...");
+      try {
+        console.log("[Dashboard] Fetching scenario settings...");
 
-      const clientId = getCurrentClientId();
-      if (!clientId) {
-        console.error("[Dashboard] No client ID found in session");
-        setLocation("/login");
-        throw new Error("Please log in again");
+        const clientId = getCurrentClientId();
+        console.log("[Dashboard] Client ID:", clientId);
+
+        if (!clientId) {
+          console.error("[Dashboard] No client ID found in session");
+          setLocation("/login");
+          throw new Error("Please log in again");
+        }
+
+        // Only fetch configuration from Firebase
+        const scenarioQuery = query(
+          collection(db, "scenarios"),
+          where("clientId", "==", clientId),
+          where("serviceId", "==", "CollectionReminders")
+        );
+
+        console.log("[Dashboard] Executing Firestore query...");
+        const scenarioSnapshot = await getDocs(scenarioQuery);
+        console.log("[Dashboard] Query result:", scenarioSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        if (scenarioSnapshot.empty) {
+          console.error("[Dashboard] No scenario found for client:", clientId);
+          throw new Error("No scenario found for this client");
+        }
+
+        const settings = {
+          clientId,
+          serviceId: "CollectionReminders",
+          scenarioId: scenarioSnapshot.docs[0].data().scenarioId
+        } as ScenarioSettings;
+
+        console.log("[Dashboard] Fetched scenario config:", settings);
+
+        if (!settings.scenarioId) {
+          console.error("[Dashboard] Missing scenario ID in config:", settings);
+          throw new Error("Invalid scenario configuration");
+        }
+
+        try {
+          console.log("[Dashboard] Fetching Make.com status...");
+          const status = await getScenarioStatus(settings.scenarioId);
+          console.log("[Dashboard] Make.com API status:", status);
+          return { settings, status };
+        } catch (apiError) {
+          console.error("[Dashboard] Make.com API error:", apiError);
+          // Return a default status if the Make.com API is unavailable
+          return {
+            settings,
+            status: {
+              scenario: {
+                id: parseInt(settings.scenarioId),
+                name: "Collection Reminders",
+                isActive: false,
+                teamId: 0,
+                description: "Automatic collection reminder calls",
+                lastEdit: new Date().toISOString(),
+                created: new Date().toISOString(),
+              }
+            }
+          };
+        }
+      } catch (error) {
+        console.error("[Dashboard] Error in queryFn:", error);
+        throw error;
       }
-
-      // Only fetch configuration from Firebase
-      const scenarioQuery = query(
-        collection(db, "scenarios"),
-        where("clientId", "==", clientId),
-        where("serviceId", "==", "CollectionReminders")
-      );
-      const scenarioSnapshot = await getDocs(scenarioQuery);
-
-      if (scenarioSnapshot.empty) {
-        throw new Error("No scenario found for this client");
-      }
-
-      // Extract only the configuration fields
-      const settings = {
-        clientId,
-        serviceId: "CollectionReminders",
-        scenarioId: scenarioSnapshot.docs[0].data().scenarioId
-      } as ScenarioSettings;
-
-      console.log("[Dashboard] Fetched scenario config:", settings);
-
-      if (!settings.scenarioId) {
-        console.error("[Dashboard] Missing scenario ID in config:", settings);
-        throw new Error("Invalid scenario configuration");
-      }
-
-      // Get live status from Make.com API
-      const status = await getScenarioStatus(settings.scenarioId);
-      console.log("[Dashboard] Make.com API status:", status);
-
-      return { settings, status };
     },
     refetchInterval: 30000 // Refresh every 30 seconds
   });
@@ -204,14 +232,14 @@ export default function CollectionsDashboardPage() {
                   {scenarioData?.status.scenario.isActive ? "Active" : "Paused"}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {scenarioData?.status.scenario.isActive 
+                  {scenarioData?.status.scenario.isActive
                     ? "Automatic calls are enabled"
                     : "Automatic calls are disabled"}
                 </p>
               </div>
               <div className={`h-3 w-3 rounded-full ${
-                scenarioData?.status.scenario.isActive 
-                  ? "bg-green-500" 
+                scenarioData?.status.scenario.isActive
+                  ? "bg-green-500"
                   : "bg-yellow-500"
               }`} />
             </div>
@@ -227,7 +255,7 @@ export default function CollectionsDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {scenarioData?.status.scenario.nextExec 
+              {scenarioData?.status.scenario.nextExec
                 ? new Date(scenarioData.status.scenario.nextExec).toLocaleTimeString()
                 : "Not Scheduled"}
             </div>

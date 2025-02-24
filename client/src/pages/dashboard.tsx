@@ -18,7 +18,10 @@ export default function DashboardPage() {
         <ProductCard
           title="Collection Reminders"
           description="Automate and manage collection reminders"
-          onClick={() => setLocation("/collections-dashboard")}
+          onClick={() => {
+            console.log("Navigating to collections dashboard");
+            setLocation("/collections-dashboard");
+          }}
         />
         <ProductCard
           title="Collection Handling"

@@ -9,7 +9,8 @@ import {
   HeadsetIcon,
   ChevronDown,
   ChevronRight,
-  Database
+  Database,
+  Phone // Added for campaigns
 } from "lucide-react";
 import { useState } from "react";
 
@@ -21,9 +22,10 @@ const configMenuItems = [
 
 const mainMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: Phone, label: "Campaigns", href: "/campaigns" }, // Added campaigns to main menu
   { icon: Users, label: "Users", href: "/users" },
   { icon: Settings, label: "Subscriptions", href: "/subscriptions" },
-  { icon: Database, label: "Raw Data", href: "/raw-data" }  // Added to main menu items
+  { icon: Database, label: "Raw Data", href: "/raw-data" }
 ];
 
 export function Sidebar() {
