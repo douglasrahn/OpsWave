@@ -12,6 +12,7 @@ import SubscriptionsPage from "@/pages/subscriptions";
 import CollectionsConfigPage from "@/pages/config/collections";
 import CollectionsDashboardPage from "@/pages/collections-dashboard";
 import RawDataPage from "@/pages/raw-data";
+import CampaignsPage from "@/pages/campaigns";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/users" component={UsersPage} />
       <Route path="/subscriptions" component={SubscriptionsPage} />
+      <Route path="/campaigns" component={CampaignsPage} />
       <Route path="/config/collections" component={CollectionsConfigPage} />
       <Route path="/collections-dashboard" component={CollectionsDashboardPage} />
       <Route path="/raw-data" component={RawDataPage} />

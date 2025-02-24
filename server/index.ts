@@ -8,13 +8,14 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Basic request logging middleware
+// Basic request logging middleware with path logging
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
+  log(`[Server] Incoming request: ${req.method} ${path}`);
   res.on("finish", () => {
     const duration = Date.now() - start;
-    log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
+    log(`[Server] ${req.method} ${path} ${res.statusCode} in ${duration}ms`);
   });
   next();
 });
