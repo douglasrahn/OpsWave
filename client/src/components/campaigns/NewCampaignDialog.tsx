@@ -20,19 +20,6 @@ import { z } from "zod";
 
 const campaignSchema = z.object({
   campaignName: z.string().min(1, "Campaign name is required"),
-  companyName: z.string().min(1, "Company name is required"),
-  contactFirstName: z.string().optional().nullable(),
-  contactLastName: z.string().optional().nullable(),
-  contactPhone: z.string().optional().nullable(),
-  companyAddress1: z.string().optional().nullable(),
-  companyAddress2: z.string().optional().nullable(),
-  companyCity: z.string().optional().nullable(),
-  companyState: z.string().optional().nullable(),
-  companyZip: z.string().optional().nullable(),
-  companyPhone: z.string().optional().nullable(),
-  pastDueAmount: z.number().min(0, "Amount must be positive"),
-  previousNotes: z.string().optional().nullable(),
-  log: z.string().optional().nullable()
 });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
@@ -44,32 +31,23 @@ export function NewCampaignDialog() {
     resolver: zodResolver(campaignSchema),
     defaultValues: {
       campaignName: "",
-      companyName: "",
-      contactFirstName: "",
-      contactLastName: "",
-      contactPhone: "",
-      companyAddress1: "",
-      companyAddress2: "",
-      companyCity: "",
-      companyState: "",
-      companyZip: "",
-      companyPhone: "",
-      pastDueAmount: 0,
-      previousNotes: "",
-      log: ""
     }
   });
 
   const onSubmit = async (data: CampaignFormData) => {
     try {
-      await addDoc(collection(db, "campaigns"), {
+      // Create new campaign document with minimal data
+      const docRef = await addDoc(collection(db, "campaigns"), {
         ...data,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
+      console.log("Created new campaign with ID:", docRef.id);
+
       toast({
-        title: "Campaign created successfully"
+        title: "Campaign created successfully",
+        description: `Campaign ID: ${docRef.id}`
       });
 
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
@@ -96,7 +74,7 @@ export function NewCampaignDialog() {
         <DialogHeader>
           <DialogTitle>Create New Campaign</DialogTitle>
           <DialogDescription>
-            Enter the details for the new collection campaign.
+            Enter a name for the new collection campaign. Additional details can be added later through CSV upload or manual editing.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -104,34 +82,6 @@ export function NewCampaignDialog() {
             <Input
               placeholder="Campaign Name"
               {...form.register("campaignName")}
-            />
-            <Input
-              placeholder="Company Name"
-              {...form.register("companyName")}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                placeholder="Contact First Name"
-                {...form.register("contactFirstName")}
-              />
-              <Input
-                placeholder="Contact Last Name"
-                {...form.register("contactLastName")}
-              />
-            </div>
-            <Input
-              placeholder="Contact Phone"
-              {...form.register("contactPhone")}
-            />
-            <Input
-              placeholder="Past Due Amount"
-              type="number"
-              step="0.01"
-              {...form.register("pastDueAmount", { valueAsNumber: true })}
-            />
-            <Input
-              placeholder="Previous Notes"
-              {...form.register("previousNotes")}
             />
             <Button type="submit">Create Campaign</Button>
           </form>

@@ -14,7 +14,7 @@ interface Campaign {
   companyName: string;
   contactFirstName: string | null;
   contactLastName: string | null;
-  pastDueAmount: number;
+  pastDueAmount: number | null;
   createdAt: string;
 }
 
@@ -38,12 +38,16 @@ export function CampaignTable({ campaigns }: CampaignTableProps) {
         {campaigns.map((campaign) => (
           <TableRow key={campaign.id}>
             <TableCell>{campaign.campaignName}</TableCell>
-            <TableCell>{campaign.companyName}</TableCell>
+            <TableCell>{campaign.companyName || 'N/A'}</TableCell>
             <TableCell>
-              {campaign.contactFirstName} {campaign.contactLastName}
+              {campaign.contactFirstName || campaign.contactLastName 
+                ? `${campaign.contactFirstName || ''} ${campaign.contactLastName || ''}`
+                : 'N/A'}
             </TableCell>
             <TableCell>
-              ${campaign.pastDueAmount.toFixed(2)}
+              {campaign.pastDueAmount !== null 
+                ? `$${campaign.pastDueAmount.toFixed(2)}`
+                : 'N/A'}
             </TableCell>
             <TableCell>
               {campaign.createdAt ? format(new Date(campaign.createdAt), 'MMM d, yyyy') : 'N/A'}
