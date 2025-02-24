@@ -13,7 +13,13 @@ const TABLES = [
     id: "campaigns", 
     name: "Campaigns", 
     icon: FileSpreadsheet,
-    description: "Campaign data including contacts and status"
+    description: "Campaign configurations and basic info"
+  },
+  { 
+    id: "campaign_entries", 
+    name: "Campaign Entries", 
+    icon: FileSpreadsheet,
+    description: "Individual campaign contact records and status"
   },
   { 
     id: "clients", 
