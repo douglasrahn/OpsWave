@@ -6,6 +6,9 @@ const MAKE_API_KEY = process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
 
 export function registerRoutes(app: Express): Server {
+  // Create HTTP server first
+  const httpServer = createServer(app);
+
   // Get scenario status
   app.get('/api/scenarios/:scenarioId', async (req, res) => {
     try {
@@ -133,6 +136,5 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  const httpServer = createServer(app);
   return httpServer;
 }
