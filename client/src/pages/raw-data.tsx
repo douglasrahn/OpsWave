@@ -3,16 +3,30 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Database } from "lucide-react";
+import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// List of available Firebase tables
+// List of available Firebase tables with improved metadata
 const TABLES = [
-  { id: "campaigns", name: "Campaigns", icon: Database },
-  { id: "clients", name: "Clients", icon: Database },
-  { id: "scenarios", name: "Scenarios", icon: Database },
-  { id: "users", name: "Users", icon: Database }
+  { 
+    id: "campaigns", 
+    name: "Campaigns", 
+    icon: FileSpreadsheet,
+    description: "Campaign data including contacts and status"
+  },
+  { 
+    id: "clients", 
+    name: "Clients", 
+    icon: Users,
+    description: "Client organization information"
+  },
+  { 
+    id: "scenarios", 
+    name: "Scenarios", 
+    icon: Settings,
+    description: "Automation scenario configurations"
+  }
 ];
 
 export default function RawDataPage() {
@@ -74,7 +88,7 @@ export default function RawDataPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  Click to edit {table.name.toLowerCase()} data
+                  {table.description}
                 </p>
               </CardContent>
             </Card>

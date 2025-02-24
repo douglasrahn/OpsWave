@@ -47,7 +47,7 @@ export function NewCampaignDialog() {
 
       toast({
         title: "Campaign created successfully",
-        description: `Campaign ID: ${docRef.id}`
+        description: "You can now add details through CSV upload or raw data editor"
       });
 
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
@@ -74,7 +74,7 @@ export function NewCampaignDialog() {
         <DialogHeader>
           <DialogTitle>Create New Campaign</DialogTitle>
           <DialogDescription>
-            Enter a name for the new collection campaign. Additional details can be added later through CSV upload or manual editing.
+            Enter a name for the new collection campaign. You can add contact details and other information later through CSV upload or the raw data editor.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -83,7 +83,7 @@ export function NewCampaignDialog() {
               placeholder="Campaign Name"
               {...form.register("campaignName")}
             />
-            <Button type="submit">Create Campaign</Button>
+            <Button type="submit" className="w-full">Create Campaign</Button>
           </form>
         </Form>
       </DialogContent>

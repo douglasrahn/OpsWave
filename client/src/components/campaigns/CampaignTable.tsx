@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { FileSpreadsheet } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -25,44 +26,48 @@ interface CampaignTableProps {
 export function CampaignTable({ campaigns }: CampaignTableProps) {
   if (campaigns.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        No campaigns found. Create a new campaign to get started.
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <FileSpreadsheet className="h-12 w-12 mb-4" />
+        <p className="text-lg font-medium">No campaigns yet</p>
+        <p className="text-sm">Create a new campaign to get started.</p>
       </div>
     );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Campaign Name</TableHead>
-          <TableHead>Company</TableHead>
-          <TableHead>Contact</TableHead>
-          <TableHead>Past Due Amount</TableHead>
-          <TableHead>Created</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {campaigns.map((campaign) => (
-          <TableRow key={campaign.id}>
-            <TableCell className="font-medium">{campaign.campaignName}</TableCell>
-            <TableCell>{campaign.companyName || 'Not Set'}</TableCell>
-            <TableCell>
-              {campaign.contactFirstName || campaign.contactLastName 
-                ? `${campaign.contactFirstName || ''} ${campaign.contactLastName || ''}`.trim()
-                : 'Not Set'}
-            </TableCell>
-            <TableCell>
-              {campaign.pastDueAmount != null 
-                ? `$${campaign.pastDueAmount.toFixed(2)}`
-                : 'Not Set'}
-            </TableCell>
-            <TableCell>
-              {format(new Date(campaign.createdAt), 'MMM d, yyyy')}
-            </TableCell>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[300px]">Campaign Name</TableHead>
+            <TableHead>Company</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Past Due Amount</TableHead>
+            <TableHead className="w-[150px]">Created</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {campaigns.map((campaign) => (
+            <TableRow key={campaign.id}>
+              <TableCell className="font-medium">{campaign.campaignName}</TableCell>
+              <TableCell>{campaign.companyName || 'Not Set'}</TableCell>
+              <TableCell>
+                {campaign.contactFirstName || campaign.contactLastName 
+                  ? `${campaign.contactFirstName || ''} ${campaign.contactLastName || ''}`.trim()
+                  : 'Not Set'}
+              </TableCell>
+              <TableCell>
+                {campaign.pastDueAmount != null 
+                  ? `$${campaign.pastDueAmount.toFixed(2)}`
+                  : 'Not Set'}
+              </TableCell>
+              <TableCell>
+                {format(new Date(campaign.createdAt), 'MMM d, yyyy')}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
