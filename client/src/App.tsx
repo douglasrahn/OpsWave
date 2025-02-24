@@ -11,6 +11,7 @@ import UsersPage from "@/pages/users";
 import SubscriptionsPage from "@/pages/subscriptions";
 import CollectionsConfigPage from "@/pages/config/collections";
 import CollectionsDashboardPage from "@/pages/collections-dashboard";
+import RawDataPage from "@/pages/raw-data";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/subscriptions" component={SubscriptionsPage} />
       <Route path="/config/collections" component={CollectionsConfigPage} />
       <Route path="/collections-dashboard" component={CollectionsDashboardPage} />
+      <Route path="/raw-data" component={RawDataPage} />
       <Route component={NotFound} />
     </Switch>
   );
