@@ -1,0 +1,121 @@
+import { useEffect, useState } from "react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { TableEditor } from "@/components/raw-data/TableEditor";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Database } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/use-auth";
+import { Redirect } from "wouter";
+
+// List of available Firebase tables
+const TABLES = [
+  { id: "clients", name: "Clients", icon: Database },
+  { id: "scenarios", name: "Scenarios", icon: Database },
+  { id: "users", name: "Users", icon: Database }
+];
+
+export default function RawDataPage() {
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [tableData, setTableData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Check if user is admin
+  if (!user || user.accessLevel !== "admin") {
+    return <Redirect to="/" />;
+  }
+
+  const fetchTableData = async (tableName: string) => {
+    setIsLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, tableName));
+      const data = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTableData(data);
+      setSelectedTable(tableName);
+    } catch (error) {
+      console.error("Error fetching table data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch table data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (selectedTable) {
+      fetchTableData(selectedTable);
+    }
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Raw Data Editor</h1>
+        <p className="text-muted-foreground mt-2">
+          Administrative interface for managing database tables
+        </p>
+      </div>
+
+      {!selectedTable ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {TABLES.map(table => (
+            <Card
+              key={table.id}
+              className="cursor-pointer hover:bg-accent/50 transition-colors"
+              onClick={() => fetchTableData(table.id)}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {table.name}
+                </CardTitle>
+                <table.icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Click to edit {table.name.toLowerCase()} data
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold">{
+              TABLES.find(t => t.id === selectedTable)?.name
+            } Table</h2>
+            <div className="flex gap-2">
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => setSelectedTable(null)}
+              >
+                ← Back to Tables
+              </button>
+            </div>
+          </div>
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <TableEditor
+              tableName={selectedTable}
+              data={tableData}
+              onRefresh={handleRefresh}
+            />
+          )}
+        </div>
+      )}
+    </DashboardLayout>
+  );
+}

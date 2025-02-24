@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,6 +8,21 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   accessLevel: text("access_level").notNull(),
   clientId: text("client_id").notNull(),
+  provider: text("provider"),
+  providerId: text("provider_id"),
+  displayName: text("display_name"),
+  email: text("email"),
+});
+
+export const oauthTokens = pgTable("oauth_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  provider: text("provider").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const clients = pgTable("clients", {
@@ -37,7 +52,17 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   surveyScenarioId: true,
 });
 
+export const insertOAuthTokenSchema = createInsertSchema(oauthTokens).pick({
+  userId: true,
+  provider: true,
+  accessToken: true,
+  refreshToken: true,
+  expiresAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+export type InsertOAuthToken = z.infer<typeof insertOAuthTokenSchema>;
+export type OAuthToken = typeof oauthTokens.$inferSelect;
