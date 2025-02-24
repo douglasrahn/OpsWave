@@ -12,11 +12,13 @@ import { FileSpreadsheet } from "lucide-react";
 interface Campaign {
   id: string;
   campaignName: string;
+  createdAt: string;
+  //Other fields remain here, accessible through raw data editor
   companyName?: string;
   contactFirstName?: string | null;
   contactLastName?: string | null;
   pastDueAmount?: number | null;
-  createdAt: string;
+
 }
 
 interface CampaignTableProps {
@@ -39,28 +41,14 @@ export function CampaignTable({ campaigns }: CampaignTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[300px]">Campaign Name</TableHead>
-            <TableHead>Company</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Past Due Amount</TableHead>
-            <TableHead className="w-[150px]">Created</TableHead>
+            <TableHead className="w-[400px]">Campaign Name</TableHead>
+            <TableHead className="w-[200px]">Created</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {campaigns.map((campaign) => (
             <TableRow key={campaign.id}>
               <TableCell className="font-medium">{campaign.campaignName}</TableCell>
-              <TableCell>{campaign.companyName || 'Not Set'}</TableCell>
-              <TableCell>
-                {campaign.contactFirstName || campaign.contactLastName 
-                  ? `${campaign.contactFirstName || ''} ${campaign.contactLastName || ''}`.trim()
-                  : 'Not Set'}
-              </TableCell>
-              <TableCell>
-                {campaign.pastDueAmount != null 
-                  ? `$${campaign.pastDueAmount.toFixed(2)}`
-                  : 'Not Set'}
-              </TableCell>
               <TableCell>
                 {format(new Date(campaign.createdAt), 'MMM d, yyyy')}
               </TableCell>
