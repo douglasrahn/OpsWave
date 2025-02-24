@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -37,27 +37,6 @@ export const clients = pgTable("clients", {
   surveyEnabled: boolean("survey_enabled").default(false),
 });
 
-export const campaigns = pgTable("campaigns", {
-  id: serial("id").primaryKey(),
-  clientId: integer("client_id").notNull(),
-  campaignName: text("campaign_name").notNull(),
-  contactFirstName: text("contact_first_name"),
-  contactLastName: text("contact_last_name"),
-  contactPhone: text("contact_phone"),
-  companyName: text("company_name").notNull(),
-  companyAddress1: text("company_address1"),
-  companyAddress2: text("company_address2"),
-  companyCity: text("company_city"),
-  companyState: text("company_state"),
-  companyZip: text("company_zip"),
-  companyPhone: text("company_phone"),
-  pastDueAmount: numeric("past_due_amount"),
-  previousNotes: text("previous_notes"),
-  log: text("log"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -81,29 +60,9 @@ export const insertOAuthTokenSchema = createInsertSchema(oauthTokens).pick({
   expiresAt: true,
 });
 
-export const insertCampaignSchema = createInsertSchema(campaigns).pick({
-  clientId: true,
-  campaignName: true,
-  contactFirstName: true,
-  contactLastName: true,
-  contactPhone: true,
-  companyName: true,
-  companyAddress1: true,
-  companyAddress2: true,
-  companyCity: true,
-  companyState: true,
-  companyZip: true,
-  companyPhone: true,
-  pastDueAmount: true,
-  previousNotes: true,
-  log: true,
-});
-
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertOAuthToken = z.infer<typeof insertOAuthTokenSchema>;
 export type OAuthToken = typeof oauthTokens.$inferSelect;
-export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
-export type Campaign = typeof campaigns.$inferSelect;
