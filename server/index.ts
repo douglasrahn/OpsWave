@@ -17,13 +17,19 @@ app.get('/health', (req, res) => {
 
 async function startServer() {
   try {
+    console.log("Starting server initialization...");
+
+    // Create HTTP server
+    const server = createServer(app);
+
     if (process.env.NODE_ENV !== 'production') {
       // Setup Vite development server first
-      const server = createServer(app);
+      console.log("Setting up Vite for development...");
       await setupVite(app, server);
     }
 
     // Register API routes after Vite setup
+    console.log("Registering routes...");
     registerRoutes(app);
 
     // Error handling middleware must be last
@@ -32,9 +38,19 @@ async function startServer() {
       res.status(500).json({ error: 'Internal Server Error' });
     });
 
-    // Start the server
-    app.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running at http://0.0.0.0:${PORT}`);
+    }).on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Trying to close existing connection...`);
+        setTimeout(() => {
+          server.close();
+          server.listen(PORT, '0.0.0.0');
+        }, 1000);
+      } else {
+        console.error('Server failed to start:', err);
+        process.exit(1);
+      }
     });
 
   } catch (error) {
