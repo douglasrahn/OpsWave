@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { log } from "./vite";
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
@@ -28,11 +29,28 @@ const startServer = async () => {
       server = null;
     }
 
-    // Test route for raw-data
-    app.get("/raw-data", (_req, res) => {
-      log("[Server] Serving raw-data test route");
-      res.send("Raw Data page is accessible");
+    log("[Server] Registering routes...");
+    registerRoutes(app); // Integrate routes
+
+    // Error handling middleware
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      log(`[Server] Error handler caught: ${message}`);
+      res.status(status).json({ message });
+      throw err;
     });
+
+    // Setup Vite or static serving based on environment
+    if (app.get("env") === "development") {
+      log("[Server] Setting up Vite for development...");
+      await setupVite(app, server);
+      log("[Server] Vite setup complete");
+    } else {
+      log("[Server] Setting up static serving...");
+      serveStatic(app);
+      log("[Server] Static serving setup complete");
+    }
 
     const PORT = 5000;
     log(`[Server] Attempting to start server on port ${PORT}...`);
