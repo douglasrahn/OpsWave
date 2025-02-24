@@ -19,7 +19,9 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const { toast } = useToast();
 
   // Get header fields from the first row of data
-  const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
+  const headers = data.length > 0 
+    ? Object.keys(data[0]).filter(key => key !== 'id')
+    : [];
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
@@ -64,14 +66,24 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
     }));
   };
 
+  // Format field names for display
+  const formatFieldName = (field: string) => {
+    // Convert camelCase to Title Case with spaces
+    return field
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  };
+
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[50px]">Actions</TableHead>
+            <TableHead className="w-[100px]">Actions</TableHead>
+            <TableHead className="w-[80px]">ID</TableHead>
             {headers.map(header => (
-              <TableHead key={header}>{header}</TableHead>
+              <TableHead key={header}>{formatFieldName(header)}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -106,15 +118,17 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                   </Button>
                 )}
               </TableCell>
+              <TableCell>{row.id}</TableCell>
               {headers.map(header => (
                 <TableCell key={`${row.id}-${header}`}>
                   {editingRow === row.id ? (
                     <Input
                       value={editedData?.[header] ?? ''}
                       onChange={(e) => handleInputChange(header, e.target.value)}
+                      className="min-w-[120px]"
                     />
                   ) : (
-                    row[header]
+                    row[header] === undefined ? 'Not Set' : row[header]
                   )}
                 </TableCell>
               ))}
