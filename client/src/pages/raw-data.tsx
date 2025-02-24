@@ -6,8 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Database } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
 
 // List of available Firebase tables
 const TABLES = [
@@ -21,12 +19,6 @@ export default function RawDataPage() {
   const [tableData, setTableData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
-
-  // Check if user is admin
-  if (!user || user.accessLevel !== "admin") {
-    return <Redirect to="/" />;
-  }
 
   const fetchTableData = async (tableName: string) => {
     setIsLoading(true);
@@ -102,7 +94,7 @@ export default function RawDataPage() {
               </button>
             </div>
           </div>
-          
+
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

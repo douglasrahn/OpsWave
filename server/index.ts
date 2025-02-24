@@ -36,30 +36,92 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+let server: any = null;
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+const startServer = async () => {
+  try {
+    log("[Server] Starting server initialization...");
 
-    res.status(status).json({ message });
-    throw err;
-  });
+    if (server) {
+      log("[Server] Closing existing server instance...");
+      await new Promise((resolve) => server.close(resolve));
+      server = null;
+    }
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    log("[Server] Registering routes...");
+    server = await registerRoutes(app);
+    log("[Server] Routes registered successfully");
+
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      log(`[Server] Error handler caught: ${message}`);
+      res.status(status).json({ message });
+      throw err;
+    });
+
+    // Temporarily force production mode to bypass Vite setup
+    const isDev = false; // app.get("env") === "development";
+
+    if (isDev) {
+      log("[Server] Setting up Vite for development...");
+      await setupVite(app, server);
+      log("[Server] Vite setup complete");
+    } else {
+      log("[Server] Setting up static serving...");
+      serveStatic(app);
+      log("[Server] Static serving setup complete");
+    }
+
+    const PORT = 5000;
+    log(`[Server] Attempting to start server on port ${PORT}...`);
+
+    await new Promise<void>((resolve, reject) => {
+      server.listen(PORT, "0.0.0.0", () => {
+        log(`[Server] Started successfully on port ${PORT}`);
+        resolve();
+      }).on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          log(`[Server] Port ${PORT} is already in use`);
+          server.close();
+          reject(new Error(`Port ${PORT} is already in use`));
+        } else {
+          log(`[Server] Server error: ${err.message}`);
+          reject(err);
+        }
+      });
+    });
+
+  } catch (error) {
+    log(`[Server] Failed to start server: ${error}`);
+    if (server) {
+      server.close();
+      server = null;
+    }
+    process.exit(1);
   }
+};
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
-  });
-})();
+// Handle cleanup on process termination
+process.on('SIGTERM', () => {
+  log('[Server] Received SIGTERM signal');
+  if (server) {
+    server.close(() => {
+      log('[Server] Server gracefully terminated');
+      process.exit(0);
+    });
+  }
+});
+
+process.on('SIGINT', () => {
+  log('[Server] Received SIGINT signal');
+  if (server) {
+    server.close(() => {
+      log('[Server] Server gracefully terminated');
+      process.exit(0);
+    });
+  }
+});
+
+log('[Server] Initial startup sequence beginning...');
+startServer();

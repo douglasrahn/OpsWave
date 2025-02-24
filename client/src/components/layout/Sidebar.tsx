@@ -12,7 +12,6 @@ import {
   Database
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
 
 const configMenuItems = [
   { icon: FileSpreadsheet, label: "Collection Reminders", href: "/config/collections" },
@@ -23,13 +22,13 @@ const configMenuItems = [
 const mainMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Users, label: "Users", href: "/users" },
-  { icon: Settings, label: "Subscriptions", href: "/subscriptions" }
+  { icon: Settings, label: "Subscriptions", href: "/subscriptions" },
+  { icon: Database, label: "Raw Data", href: "/raw-data" }  // Added to main menu items
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
   const [isConfigExpanded, setIsConfigExpanded] = useState(false);
-  const { user } = useAuth();
 
   return (
     <aside className="w-64 border-r bg-white">
@@ -49,22 +48,6 @@ export function Sidebar() {
             <span>{item.label}</span>
           </Link>
         ))}
-
-        {/* Show RawData link only for admin users */}
-        {user?.accessLevel === "admin" && (
-          <Link 
-            href="/raw-data"
-            className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-md transition-colors",
-              location === "/raw-data"
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted"
-            )}
-          >
-            <Database className="h-5 w-5" />
-            <span>Raw Data</span>
-          </Link>
-        )}
 
         {/* Configuration Section */}
         <div>
