@@ -6,7 +6,6 @@ import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getCurrentClientId } from "@/lib/auth";
 
 interface TableEditorProps {
   tableName: string;
@@ -19,10 +18,30 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
+  // Define the order of fields for campaign entries
+  const campaignEntryFields = [
+    'id',
+    'campaignId',
+    'status',
+    'contactFirstName',
+    'contactLastName',
+    'contactPhone',
+    'companyName',
+    'companyAddress1',
+    'companyAddress2',
+    'companyCity',
+    'companyState',
+    'companyZip',
+    'companyPhone',
+    'pastDueAmount',
+    'previousNotes',
+    'log'
+  ];
+
   // Get header fields from the first row of data, excluding internal fields
-  const headers = data.length > 0 
-    ? Object.keys(data[0]).filter(key => !['id'].includes(key))
-    : [];
+  const headers = tableName === 'campaign_entries' 
+    ? campaignEntryFields.filter(field => field !== 'id')
+    : (data.length > 0 ? Object.keys(data[0]).filter(key => !['id'].includes(key)) : []);
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
@@ -36,22 +55,8 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleSave = async (id: string) => {
     try {
-      const clientId = getCurrentClientId();
-      if (!clientId) {
-        throw new Error("No client ID found");
-      }
-
-      let docRef;
-      if (tableName === 'campaign_entries') {
-        const entry = data.find(entry => entry.id === id);
-        if (!entry?.campaignId) {
-          throw new Error("Campaign ID not found");
-        }
-        console.log(`Updating entry at path: /${clientId}/campaigns/${entry.campaignId}/entries/${id}`);
-        docRef = doc(db, clientId, "campaigns", entry.campaignId, "entries", id);
-      } else {
-        docRef = doc(db, tableName, id);
-      }
+      // For campaign entries, update directly in the campaigns collection
+      const docRef = doc(db, tableName === 'campaign_entries' ? 'campaigns' : tableName, id);
 
       const updateData = { ...editedData };
       delete updateData.id; // Remove id from update data
@@ -92,13 +97,20 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       .trim();
   };
 
+  // Format field value for display
+  const formatFieldValue = (value: any) => {
+    if (value === null || value === undefined) return 'Not Set';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number') return value.toString();
+    return value;
+  };
+
   return (
     <div className="rounded-md border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Actions</TableHead>
-            <TableHead className="w-[80px]">ID</TableHead>
             {headers.map(header => (
               <TableHead key={header}>{formatFieldName(header)}</TableHead>
             ))}
@@ -135,7 +147,6 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                   </Button>
                 )}
               </TableCell>
-              <TableCell>{row.id}</TableCell>
               {headers.map(header => (
                 <TableCell key={`${row.id}-${header}`}>
                   {editingRow === row.id ? (
@@ -145,7 +156,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                       className="min-w-[120px]"
                     />
                   ) : (
-                    row[header] === undefined ? 'Not Set' : row[header]
+                    formatFieldValue(row[header])
                   )}
                 </TableCell>
               ))}

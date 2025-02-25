@@ -4,10 +4,9 @@ import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
-import { collection, getDocs, query, collectionGroup, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCurrentClientId } from "@/lib/auth";
-import { createTestCampaignEntry } from "@/lib/test-data";
 
 // List of available Firebase tables with improved metadata
 const TABLES = [
@@ -55,21 +54,14 @@ export default function RawDataPage() {
       let data: any[] = [];
 
       if (tableName === 'campaign_entries') {
-        // For testing purposes, create a test entry if none exists
-        try {
-          await createTestCampaignEntry();
-          console.log("Created test campaign entry");
-        } catch (error) {
-          console.log("Test entry might already exist:", error);
-        }
-
-        // Use collectionGroup to query all entries across all campaigns
+        // Query the campaigns collection directly for entries
         const entriesQuery = query(
-          collectionGroup(db, 'entries'),
-          where('clientId', '==', clientId)
+          collection(db, "campaigns"),
+          where("clientId", "==", clientId),
+          where("campaignId", "!=", null) // Only get entries, not campaign docs
         );
 
-        console.log("Executing entries query for client:", clientId);
+        console.log("Executing entries query");
         const querySnapshot = await getDocs(entriesQuery);
         console.log(`Found ${querySnapshot.docs.length} campaign entries`);
 
