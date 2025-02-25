@@ -37,15 +37,16 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const [editedData, setEditedData] = useState<Partial<CampaignEntry>>({});
   const { toast } = useToast();
 
-  // First, get all campaigns for this client
-  const fetchCampaignsForClient = async () => {
+  // Get campaign for this client
+  const fetchCampaignForClient = async () => {
     const campaignsRef = collection(db, "campaigns");
     const q = query(campaignsRef, where("clientID", "==", clientId));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    if (querySnapshot.empty) {
+      throw new Error("No campaigns found for this client");
+    }
+    // For now, use the first campaign
+    return querySnapshot.docs[0];
   };
 
   const handleEdit = (entry: CampaignEntry) => {
@@ -58,30 +59,28 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      // Get campaigns for this client
-      const campaigns = await fetchCampaignsForClient();
-      if (campaigns.length === 0) {
-        throw new Error("No campaigns found for this client");
-      }
+      // Get campaign document
+      const campaignDoc = await fetchCampaignForClient();
+      const campaignId = campaignDoc.id;
 
-      const campaignId = campaigns[0].id;
+      // Reference to the client's data document within this campaign
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
 
-      // Get current entries
+      // Get current document data
       const docSnap = await getDoc(clientDataRef);
-      const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
+      const entries = docSnap.exists() ? docSnap.data().entries || [] : [];
 
-      // Update or add the edited entry
-      const updatedEntries = currentEntries.map((entry: CampaignEntry) =>
+      // Update the specific entry in the entries array
+      const updatedEntries = entries.map((entry: CampaignEntry) =>
         entry.id === editingId ? { ...entry, ...editedData } : entry
       );
 
-      // If entry wasn't found in the array, add it
-      if (!currentEntries.find((entry: CampaignEntry) => entry.id === editingId)) {
+      // If entry wasn't found, add it
+      if (!entries.find((entry: CampaignEntry) => entry.id === editingId)) {
         updatedEntries.push({ ...editedData, id: editingId });
       }
 
-      // Save back to Firestore
+      // Save the updated entries array back to the document
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
       toast({
@@ -108,24 +107,19 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      const campaigns = await fetchCampaignsForClient();
-      if (campaigns.length === 0) {
-        throw new Error("No campaigns found for this client");
-      }
+      const campaignDoc = await fetchCampaignForClient();
+      const campaignId = campaignDoc.id;
 
-      const campaignId = campaigns[0].id;
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-
-      // Get current entries
       const docSnap = await getDoc(clientDataRef);
+
       if (!docSnap.exists()) {
         throw new Error("No entries found");
       }
 
-      const currentEntries = docSnap.data().entries || [];
-      const updatedEntries = currentEntries.filter((e: CampaignEntry) => e.id !== entry.id);
+      const entries = docSnap.data().entries || [];
+      const updatedEntries = entries.filter((e: CampaignEntry) => e.id !== entry.id);
 
-      // Update document with filtered entries
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
       toast({
@@ -148,20 +142,15 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const handleAdd = async () => {
     setIsLoading(true);
     try {
-      const campaigns = await fetchCampaignsForClient();
-      if (campaigns.length === 0) {
-        throw new Error("No campaigns found for this client");
-      }
+      const campaignDoc = await fetchCampaignForClient();
+      const campaignId = campaignDoc.id;
 
-      const campaignId = campaigns[0].id;
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-
-      // Get current entries and calculate next ID
       const docSnap = await getDoc(clientDataRef);
-      const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
-      const nextId = currentEntries.length > 0 
-        ? Math.max(...currentEntries.map((e: CampaignEntry) => e.id)) + 1 
-        : 0;
+      const entries = docSnap.exists() ? docSnap.data().entries || [] : [];
+
+      // Calculate next ID
+      const nextId = entries.length > 0 ? Math.max(...entries.map((e: CampaignEntry) => e.id)) + 1 : 0;
 
       const newEntry: CampaignEntry = {
         id: nextId,
@@ -181,9 +170,9 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         log: ""
       };
 
-      // Add new entry to existing entries
+      // Add new entry to existing entries array
       await setDoc(clientDataRef, {
-        entries: [...currentEntries, newEntry]
+        entries: [...entries, newEntry]
       }, { merge: true });
 
       toast({
