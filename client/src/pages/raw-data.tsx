@@ -4,7 +4,7 @@ import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
-import { collection, getDocs, query, collectionGroup, where } from "firebase/firestore";
+import { collection, getDocs, query, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCurrentClientId } from "@/lib/auth";
 
@@ -54,10 +54,7 @@ export default function RawDataPage() {
 
       if (tableName === 'campaign_entries') {
         // Use collectionGroup to query all entries across all campaigns for this client
-        const entriesQuery = query(
-          collectionGroup(db, 'entries'),
-          where('clientId', '==', clientId)
-        );
+        const entriesQuery = query(collectionGroup(db, 'entries'));
         const querySnapshot = await getDocs(entriesQuery);
         data = querySnapshot.docs.map(doc => ({
           id: doc.id,
