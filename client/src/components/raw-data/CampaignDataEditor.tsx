@@ -39,14 +39,22 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
   // Get campaign for this client
   const fetchCampaignForClient = async () => {
-    const campaignsRef = collection(db, "campaigns");
-    const q = query(campaignsRef, where("clientID", "==", clientId));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-      throw new Error("No campaigns found for this client");
+    try {
+      console.log("Fetching campaign for client:", clientId);
+      const campaignsRef = collection(db, "campaigns");
+      const q = query(campaignsRef, where("clientID", "==", clientId));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        throw new Error("No campaigns found for this client");
+      }
+
+      // For now, use the first campaign
+      return querySnapshot.docs[0];
+    } catch (error) {
+      console.error("Error fetching campaign:", error);
+      throw error;
     }
-    // For now, use the first campaign
-    return querySnapshot.docs[0];
   };
 
   const handleEdit = (entry: CampaignEntry) => {
@@ -59,16 +67,22 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
+      console.log("Starting save operation for entry ID:", editingId);
+
       // Get campaign document
       const campaignDoc = await fetchCampaignForClient();
       const campaignId = campaignDoc.id;
+      console.log("Found campaign ID:", campaignId);
 
       // Reference to the client's data document within this campaign
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
 
       // Get current document data
       const docSnap = await getDoc(clientDataRef);
+      console.log("Current document exists:", docSnap.exists());
+
       const entries = docSnap.exists() ? docSnap.data().entries || [] : [];
+      console.log("Current entries:", entries);
 
       // Update the specific entry in the entries array
       const updatedEntries = entries.map((entry: CampaignEntry) =>
@@ -77,8 +91,11 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
       // If entry wasn't found, add it
       if (!entries.find((entry: CampaignEntry) => entry.id === editingId)) {
+        console.log("Entry not found, adding new entry");
         updatedEntries.push({ ...editedData, id: editingId });
       }
+
+      console.log("Saving updated entries:", updatedEntries);
 
       // Save the updated entries array back to the document
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
@@ -94,7 +111,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       console.error("Error saving changes:", error);
       toast({
         title: "Error",
-        description: "Failed to save changes",
+        description: error instanceof Error ? error.message : "Failed to save changes",
         variant: "destructive"
       });
     } finally {
@@ -102,13 +119,21 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
     }
   };
 
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditedData({});
+  };
+
   const handleDelete = async (entry: CampaignEntry) => {
     if (!confirm("Are you sure you want to delete this entry?")) return;
 
     setIsLoading(true);
     try {
+      console.log("Starting delete operation for entry ID:", entry.id);
+
       const campaignDoc = await fetchCampaignForClient();
       const campaignId = campaignDoc.id;
+      console.log("Found campaign ID:", campaignId);
 
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
       const docSnap = await getDoc(clientDataRef);
@@ -118,7 +143,10 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       }
 
       const entries = docSnap.data().entries || [];
+      console.log("Current entries before delete:", entries);
+
       const updatedEntries = entries.filter((e: CampaignEntry) => e.id !== entry.id);
+      console.log("Updated entries after delete:", updatedEntries);
 
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
@@ -131,7 +159,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       console.error("Error deleting entry:", error);
       toast({
         title: "Error",
-        description: "Failed to delete entry",
+        description: error instanceof Error ? error.message : "Failed to delete entry",
         variant: "destructive"
       });
     } finally {
@@ -142,15 +170,20 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const handleAdd = async () => {
     setIsLoading(true);
     try {
+      console.log("Starting add operation");
+
       const campaignDoc = await fetchCampaignForClient();
       const campaignId = campaignDoc.id;
+      console.log("Found campaign ID:", campaignId);
 
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
       const docSnap = await getDoc(clientDataRef);
       const entries = docSnap.exists() ? docSnap.data().entries || [] : [];
+      console.log("Current entries:", entries);
 
       // Calculate next ID
       const nextId = entries.length > 0 ? Math.max(...entries.map((e: CampaignEntry) => e.id)) + 1 : 0;
+      console.log("Next ID calculated:", nextId);
 
       const newEntry: CampaignEntry = {
         id: nextId,
@@ -184,7 +217,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       console.error("Error adding new entry:", error);
       toast({
         title: "Error",
-        description: "Failed to add new entry",
+        description: error instanceof Error ? error.message : "Failed to add new entry",
         variant: "destructive"
       });
     } finally {
@@ -340,12 +373,21 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                 <TableCell>
                   <div className="flex space-x-2">
                     {editingId === entry.id ? (
-                      <Button 
-                        onClick={handleSave}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                      </Button>
+                      <>
+                        <Button 
+                          onClick={handleSave}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleCancel}
+                          disabled={isLoading}
+                        >
+                          Cancel
+                        </Button>
+                      </>
                     ) : (
                       <Button
                         variant="outline"

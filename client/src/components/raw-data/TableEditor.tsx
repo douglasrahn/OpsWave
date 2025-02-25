@@ -31,27 +31,39 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       );
     }
 
-    // Get all campaigns for this client and their associated data
-    const fetchClientCampaignData = async () => {
-      // First get all campaigns for this client
-      const campaignsRef = collection(db, "campaigns");
-      const q = query(campaignsRef, where("clientID", "==", clientId));
-      const campaignsSnapshot = await getDocs(q);
+    // Get campaign for this client
+    const fetchCampaignForClient = async () => {
+      try {
+        console.log("Looking up client for email:", clientId);
 
-      // Get the first campaign (for now)
-      if (campaignsSnapshot.empty) {
-        return [];
+        // Query campaigns collection to get client ID for this user's email
+        const campaignsRef = collection(db, "campaigns");
+        const q = query(campaignsRef, where("clientID", "==", clientId));
+        const campaignSnapshot = await getDocs(q);
+
+        if (campaignSnapshot.empty) {
+          console.log("No campaign found for client:", clientId);
+          throw new Error("No campaign found for this client");
+        }
+
+        const campaignDoc = campaignSnapshot.docs[0];
+        const campaignId = campaignDoc.id;
+        console.log("Found campaign ID:", campaignId);
+
+        // Get client data for this campaign
+        const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+        const clientDataSnap = await getDoc(clientDataRef);
+
+        if (!clientDataSnap.exists()) {
+          console.log("No client data found for campaign:", campaignId);
+          return [];
+        }
+
+        return clientDataSnap.data().entries || [];
+      } catch (error) {
+        console.error("Error fetching campaign data:", error);
+        throw error;
       }
-
-      const campaignId = campaignsSnapshot.docs[0].id;
-      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-      const clientDataSnap = await getDoc(clientDataRef);
-
-      if (!clientDataSnap.exists()) {
-        return [];
-      }
-
-      return clientDataSnap.data().entries || [];
     };
 
     return (
@@ -68,7 +80,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
-    setEditedData({ ...row });
+    setEditedData(row);
   };
 
   const handleCancel = () => {
@@ -91,7 +103,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
       setEditingRow(null);
       setEditedData(null);
-      onRefresh(); // Refresh the data
+      onRefresh();
     } catch (error) {
       console.error("Error updating document:", error);
       toast({
