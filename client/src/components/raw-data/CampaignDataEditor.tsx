@@ -9,7 +9,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 
 interface CampaignEntry {
   id: number;
-  clientId: string; // Added clientId field
+  clientId: string;
   campaignId: string;
   status: string;
   contactFirstName: string;
@@ -22,7 +22,7 @@ interface CampaignEntry {
   companyState: string;
   companyZip: string;
   companyPhone: string;
-  pastDueAmount: number;
+  pastDueAmount: number | null;
   previousNotes: string;
   log: string;
 }
@@ -123,7 +123,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         companyState: "",
         companyZip: "",
         companyPhone: "",
-        pastDueAmount: 0,
+        pastDueAmount: null,
         previousNotes: "",
         log: ""
       };
@@ -189,7 +189,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                       onChange={(e) => handleInputChange("campaignId", e.target.value)}
                     />
                   ) : (
-                    entry.campaignId
+                    entry.campaignId || "Not Set"
                   )}
                 </TableCell>
                 <TableCell>
@@ -199,7 +199,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                       onChange={(e) => handleInputChange("status", e.target.value)}
                     />
                   ) : (
-                    entry.status
+                    entry.status || "Not Set"
                   )}
                 </TableCell>
                 <TableCell>
@@ -223,8 +223,12 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                     </div>
                   ) : (
                     <div>
-                      <div>{`${entry.contactFirstName} ${entry.contactLastName}`}</div>
-                      <div className="text-sm text-muted-foreground">{entry.contactPhone}</div>
+                      <div>{entry.contactFirstName && entry.contactLastName ? 
+                        `${entry.contactFirstName} ${entry.contactLastName}`.trim() : 
+                        "Not Set"}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {entry.contactPhone || "No Phone"}
+                      </div>
                     </div>
                   )}
                 </TableCell>
@@ -271,14 +275,20 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                     </div>
                   ) : (
                     <div>
-                      <div>{entry.companyName}</div>
+                      <div>{entry.companyName || "Not Set"}</div>
                       <div className="text-sm text-muted-foreground">
-                        {entry.companyAddress1}
-                        {entry.companyAddress2 && <>, {entry.companyAddress2}</>}
-                        <br />
-                        {entry.companyCity}, {entry.companyState} {entry.companyZip}
-                        <br />
-                        {entry.companyPhone}
+                        {entry.companyAddress1 ? (
+                          <>
+                            {entry.companyAddress1}
+                            {entry.companyAddress2 && <>, {entry.companyAddress2}</>}
+                            <br />
+                            {entry.companyCity}, {entry.companyState} {entry.companyZip}
+                            <br />
+                            {entry.companyPhone || "No Phone"}
+                          </>
+                        ) : (
+                          "No Address"
+                        )}
                       </div>
                     </div>
                   )}
@@ -287,11 +297,11 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                   {editingId === entry.id ? (
                     <Input
                       type="number"
-                      value={editedData.pastDueAmount || 0}
-                      onChange={(e) => handleInputChange("pastDueAmount", parseFloat(e.target.value))}
+                      value={editedData.pastDueAmount ?? ""}
+                      onChange={(e) => handleInputChange("pastDueAmount", e.target.value ? parseFloat(e.target.value) : null)}
                     />
                   ) : (
-                    `$${entry.pastDueAmount.toFixed(2)}`
+                    entry.pastDueAmount != null ? `$${entry.pastDueAmount.toFixed(2)}` : "Not Set"
                   )}
                 </TableCell>
                 <TableCell>
