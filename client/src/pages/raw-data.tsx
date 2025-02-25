@@ -3,12 +3,18 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
+import { Loader2, Database, FileSpreadsheet, Users, Settings, Phone } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // List of available Firebase tables with improved metadata
 const TABLES = [
+  { 
+    id: "campaigndata", 
+    name: "Campaign Entries", 
+    icon: Database,
+    description: "Detailed campaign contact and company information by client"
+  },
   { 
     id: "campaigns", 
     name: "Campaigns", 

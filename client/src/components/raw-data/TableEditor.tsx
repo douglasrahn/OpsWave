@@ -6,6 +6,8 @@ import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { CampaignDataEditor } from "./CampaignDataEditor";
+import { getCurrentClientId } from "@/lib/auth";
 
 interface TableEditorProps {
   tableName: string;
@@ -20,6 +22,30 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   // Get header fields from the first row of data
   const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
+
+  // Special handling for campaigndata table
+  if (tableName === 'campaigndata') {
+    const clientId = getCurrentClientId();
+    if (!clientId) {
+      return (
+        <div className="text-center py-8 text-destructive">
+          Error: No client ID found. Please ensure you are logged in.
+        </div>
+      );
+    }
+
+    // Find the document for the current client
+    const clientData = data.find(doc => doc.id === clientId);
+    const entries = clientData?.entries || [];
+
+    return (
+      <CampaignDataEditor
+        clientId={clientId}
+        data={entries}
+        onRefresh={onRefresh}
+      />
+    );
+  }
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
