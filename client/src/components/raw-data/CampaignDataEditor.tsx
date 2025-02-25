@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { collection, doc, setDoc, deleteDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, getDocs, query, where, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -60,8 +60,6 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
     try {
       // Get campaigns for this client
       const campaigns = await fetchCampaignsForClient();
-
-      // For now, we'll use the first campaign (you might want to add campaign selection)
       if (campaigns.length === 0) {
         throw new Error("No campaigns found for this client");
       }
@@ -69,10 +67,22 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       const campaignId = campaigns[0].id;
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
 
-      await setDoc(clientDataRef, {
-        ...editedData,
-        id: editingId // Preserve the original ID
-      });
+      // Get current entries
+      const docSnap = await getDoc(clientDataRef);
+      const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
+
+      // Update or add the edited entry
+      const updatedEntries = currentEntries.map((entry: CampaignEntry) =>
+        entry.id === editingId ? { ...entry, ...editedData } : entry
+      );
+
+      // If entry wasn't found in the array, add it
+      if (!currentEntries.find((entry: CampaignEntry) => entry.id === editingId)) {
+        updatedEntries.push({ ...editedData, id: editingId });
+      }
+
+      // Save back to Firestore
+      await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
       toast({
         title: "Changes saved successfully"
@@ -105,7 +115,18 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
       const campaignId = campaigns[0].id;
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-      await deleteDoc(clientDataRef);
+
+      // Get current entries
+      const docSnap = await getDoc(clientDataRef);
+      if (!docSnap.exists()) {
+        throw new Error("No entries found");
+      }
+
+      const currentEntries = docSnap.data().entries || [];
+      const updatedEntries = currentEntries.filter((e: CampaignEntry) => e.id !== entry.id);
+
+      // Update document with filtered entries
+      await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
       toast({
         title: "Entry deleted successfully"
@@ -133,10 +154,14 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       }
 
       const campaignId = campaigns[0].id;
-      const clientDataRef = collection(db, `campaigndata/${campaignId}/clientdata`);
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
 
-      // Calculate next ID based on existing entries
-      const nextId = data.length > 0 ? Math.max(...data.map(entry => entry.id)) + 1 : 0;
+      // Get current entries and calculate next ID
+      const docSnap = await getDoc(clientDataRef);
+      const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
+      const nextId = currentEntries.length > 0 
+        ? Math.max(...currentEntries.map((e: CampaignEntry) => e.id)) + 1 
+        : 0;
 
       const newEntry: CampaignEntry = {
         id: nextId,
@@ -156,7 +181,10 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         log: ""
       };
 
-      await setDoc(doc(clientDataRef, clientId), newEntry);
+      // Add new entry to existing entries
+      await setDoc(clientDataRef, {
+        entries: [...currentEntries, newEntry]
+      }, { merge: true });
 
       toast({
         title: "New entry added successfully"

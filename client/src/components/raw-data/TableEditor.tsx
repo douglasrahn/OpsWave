@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc, getDocs, collection, query, where } from "firebase/firestore";
+import { doc, updateDoc, getDocs, collection, query, where, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CampaignDataEditor } from "./CampaignDataEditor";
 import { getCurrentClientId } from "@/lib/auth";
@@ -38,23 +38,20 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       const q = query(campaignsRef, where("clientID", "==", clientId));
       const campaignsSnapshot = await getDocs(q);
 
-      let allEntries = [];
-      // For each campaign, get its client data
-      for (const campaignDoc of campaignsSnapshot.docs) {
-        const campaignId = campaignDoc.id;
-        const clientDataRef = collection(db, `campaigndata/${campaignId}/clientdata`);
-        const clientDataSnapshot = await getDocs(clientDataRef);
-
-        // Get the client's data for this campaign
-        const clientData = clientDataSnapshot.docs
-          .find(doc => doc.id === clientId);
-
-        if (clientData) {
-          allEntries.push(clientData.data());
-        }
+      // Get the first campaign (for now)
+      if (campaignsSnapshot.empty) {
+        return [];
       }
 
-      return allEntries;
+      const campaignId = campaignsSnapshot.docs[0].id;
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+      const clientDataSnap = await getDoc(clientDataRef);
+
+      if (!clientDataSnap.exists()) {
+        return [];
+      }
+
+      return clientDataSnap.data().entries || [];
     };
 
     return (
