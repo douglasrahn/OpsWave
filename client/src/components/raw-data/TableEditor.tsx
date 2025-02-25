@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc, collection } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCurrentClientId } from "@/lib/auth";
 
@@ -21,7 +21,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   // Get header fields from the first row of data, excluding internal fields
   const headers = data.length > 0 
-    ? Object.keys(data[0]).filter(key => !['id', 'clientId'].includes(key))
+    ? Object.keys(data[0]).filter(key => !['id'].includes(key))
     : [];
 
   const handleEdit = (row: Record<string, any>) => {
@@ -43,12 +43,12 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
       let docRef;
       if (tableName === 'campaign_entries') {
-        // Find the campaign ID from the data
         const entry = data.find(entry => entry.id === id);
         if (!entry?.campaignId) {
           throw new Error("Campaign ID not found");
         }
-        docRef = doc(db, `clients/${clientId}/campaigns/${entry.campaignId}/entries`, id);
+        console.log(`Updating entry at path: /${clientId}/campaigns/${entry.campaignId}/entries/${id}`);
+        docRef = doc(db, clientId, "campaigns", entry.campaignId, "entries", id);
       } else {
         docRef = doc(db, tableName, id);
       }
@@ -71,14 +71,14 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       console.error("Error updating document:", error);
       toast({
         title: "Error",
-        description: "Failed to update record",
+        description: error instanceof Error ? error.message : "Failed to update record",
         variant: "destructive"
       });
     }
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setEditedData((prev: Record<string, any> | null) => ({
+    setEditedData(prev => ({
       ...prev,
       [field]: value
     }));

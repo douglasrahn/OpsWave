@@ -7,6 +7,7 @@ import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-reac
 import { collection, getDocs, query, collectionGroup, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCurrentClientId } from "@/lib/auth";
+import { createTestCampaignEntry } from "@/lib/test-data";
 
 // List of available Firebase tables with improved metadata
 const TABLES = [
@@ -50,34 +51,50 @@ export default function RawDataPage() {
         throw new Error("No client ID found");
       }
 
+      console.log(`Fetching data for table: ${tableName}, clientId: ${clientId}`);
       let data: any[] = [];
 
       if (tableName === 'campaign_entries') {
-        // Use collectionGroup to query all entries across all campaigns for this client
+        // For testing purposes, create a test entry if none exists
+        try {
+          await createTestCampaignEntry();
+          console.log("Created test campaign entry");
+        } catch (error) {
+          console.log("Test entry might already exist:", error);
+        }
+
+        // Use collectionGroup to query all entries across all campaigns
         const entriesQuery = query(
           collectionGroup(db, 'entries'),
           where('clientId', '==', clientId)
         );
+
+        console.log("Executing entries query for client:", clientId);
         const querySnapshot = await getDocs(entriesQuery);
+        console.log(`Found ${querySnapshot.docs.length} campaign entries`);
+
         data = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
       } else {
-        const querySnapshot = await getDocs(collection(db, tableName));
+        const collectionRef = collection(db, tableName);
+        console.log(`Fetching collection: ${tableName}`);
+        const querySnapshot = await getDocs(collectionRef);
         data = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
       }
 
+      console.log(`Fetched ${data.length} records for ${tableName}`);
       setTableData(data);
       setSelectedTable(tableName);
     } catch (error) {
       console.error("Error fetching table data:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch table data",
+        description: error instanceof Error ? error.message : "Failed to fetch table data",
         variant: "destructive"
       });
     } finally {
