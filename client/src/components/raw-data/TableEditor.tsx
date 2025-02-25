@@ -20,9 +20,6 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
-  // Get header fields from the first row of data
-  const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
-
   // Special handling for campaigndata table
   if (tableName === 'campaigndata') {
     const clientId = getCurrentClientId();
@@ -34,18 +31,20 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       );
     }
 
-    // Find the document for the current client
-    const clientData = data.find(doc => doc.id === clientId);
-    const entries = clientData?.entries || [];
+    // Filter entries for current client
+    const clientEntries = data.filter(entry => entry.clientId === clientId);
 
     return (
       <CampaignDataEditor
         clientId={clientId}
-        data={entries}
+        data={clientEntries}
         onRefresh={onRefresh}
       />
     );
   }
+
+  // Get header fields from the first row of data
+  const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);

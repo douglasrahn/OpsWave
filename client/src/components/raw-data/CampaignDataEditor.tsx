@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 
 interface CampaignEntry {
   id: number;
+  clientId: string; // Added clientId field
   campaignId: string;
   status: string;
   contactFirstName: string;
@@ -48,21 +49,10 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      const docRef = doc(db, "campaigndata", clientId);
-      const docSnap = await getDoc(docRef);
-      const currentData = docSnap.data();
-
-      if (!currentData?.entries) {
-        throw new Error("No entries found in document");
-      }
-
-      // Update the specific entry in the array
-      const updatedEntries = currentData.entries.map((entry: CampaignEntry) =>
-        entry.id === editingId ? { ...entry, ...editedData } : entry
-      );
-
-      await updateDoc(docRef, {
-        entries: updatedEntries
+      const docRef = doc(db, "campaigndata", `${clientId}_${editingId}`);
+      await setDoc(docRef, {
+        ...editedData,
+        clientId // Ensure clientId is included
       });
 
       toast({
@@ -89,10 +79,8 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      const docRef = doc(db, "campaigndata", clientId);
-      await updateDoc(docRef, {
-        entries: arrayRemove(entry)
-      });
+      const docRef = doc(db, "campaigndata", `${clientId}_${entry.id}`);
+      await deleteDoc(docRef);
 
       toast({
         title: "Entry deleted successfully"
@@ -114,18 +102,15 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const handleAdd = async () => {
     setIsLoading(true);
     try {
-      const docRef = doc(db, "campaigndata", clientId);
-      const docSnap = await getDoc(docRef);
-      const currentData = docSnap.data();
-
-      // Calculate next ID
-      const currentEntries = currentData?.entries || [];
-      const nextId = currentEntries.length > 0 
-        ? Math.max(...currentEntries.map((e: CampaignEntry) => e.id)) + 1 
-        : 1;
+      // Find the next available ID
+      const campaigndataRef = collection(db, "campaigndata");
+      const q = query(campaigndataRef, where("clientId", "==", clientId));
+      const querySnapshot = await getDocs(q);
+      const nextId = querySnapshot.empty ? 1 : Math.max(...querySnapshot.docs.map(doc => parseInt(doc.id.split('_')[1], 10))) + 1;
 
       const newEntry: CampaignEntry = {
         id: nextId,
+        clientId,
         campaignId: "",
         status: "new",
         contactFirstName: "",
@@ -143,9 +128,8 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         log: ""
       };
 
-      await updateDoc(docRef, {
-        entries: arrayUnion(newEntry)
-      });
+      const docRef = doc(db, "campaigndata", `${clientId}_${nextId}`);
+      await setDoc(docRef, newEntry);
 
       toast({
         title: "New entry added successfully"
@@ -185,13 +169,13 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[80px]">ID</TableHead>
+              <TableHead>ID</TableHead>
               <TableHead>Campaign ID</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Contact Name</TableHead>
-              <TableHead>Company</TableHead>
+              <TableHead>Contact Info</TableHead>
+              <TableHead>Company Info</TableHead>
               <TableHead>Amount</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -203,7 +187,6 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                     <Input
                       value={editedData.campaignId || ""}
                       onChange={(e) => handleInputChange("campaignId", e.target.value)}
-                      className="w-full"
                     />
                   ) : (
                     entry.campaignId
@@ -214,7 +197,6 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                     <Input
                       value={editedData.status || ""}
                       onChange={(e) => handleInputChange("status", e.target.value)}
-                      className="w-full"
                     />
                   ) : (
                     entry.status
@@ -233,20 +215,72 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                         onChange={(e) => handleInputChange("contactLastName", e.target.value)}
                         placeholder="Last Name"
                       />
+                      <Input
+                        value={editedData.contactPhone || ""}
+                        onChange={(e) => handleInputChange("contactPhone", e.target.value)}
+                        placeholder="Phone"
+                      />
                     </div>
                   ) : (
-                    `${entry.contactFirstName} ${entry.contactLastName}`
+                    <div>
+                      <div>{`${entry.contactFirstName} ${entry.contactLastName}`}</div>
+                      <div className="text-sm text-muted-foreground">{entry.contactPhone}</div>
+                    </div>
                   )}
                 </TableCell>
                 <TableCell>
                   {editingId === entry.id ? (
-                    <Input
-                      value={editedData.companyName || ""}
-                      onChange={(e) => handleInputChange("companyName", e.target.value)}
-                      className="w-full"
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        value={editedData.companyName || ""}
+                        onChange={(e) => handleInputChange("companyName", e.target.value)}
+                        placeholder="Company Name"
+                      />
+                      <Input
+                        value={editedData.companyAddress1 || ""}
+                        onChange={(e) => handleInputChange("companyAddress1", e.target.value)}
+                        placeholder="Address 1"
+                      />
+                      <Input
+                        value={editedData.companyAddress2 || ""}
+                        onChange={(e) => handleInputChange("companyAddress2", e.target.value)}
+                        placeholder="Address 2"
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input
+                          value={editedData.companyCity || ""}
+                          onChange={(e) => handleInputChange("companyCity", e.target.value)}
+                          placeholder="City"
+                        />
+                        <Input
+                          value={editedData.companyState || ""}
+                          onChange={(e) => handleInputChange("companyState", e.target.value)}
+                          placeholder="State"
+                        />
+                        <Input
+                          value={editedData.companyZip || ""}
+                          onChange={(e) => handleInputChange("companyZip", e.target.value)}
+                          placeholder="ZIP"
+                        />
+                      </div>
+                      <Input
+                        value={editedData.companyPhone || ""}
+                        onChange={(e) => handleInputChange("companyPhone", e.target.value)}
+                        placeholder="Phone"
+                      />
+                    </div>
                   ) : (
-                    entry.companyName
+                    <div>
+                      <div>{entry.companyName}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {entry.companyAddress1}
+                        {entry.companyAddress2 && <>, {entry.companyAddress2}</>}
+                        <br />
+                        {entry.companyCity}, {entry.companyState} {entry.companyZip}
+                        <br />
+                        {entry.companyPhone}
+                      </div>
+                    </div>
                   )}
                 </TableCell>
                 <TableCell>
@@ -255,7 +289,6 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                       type="number"
                       value={editedData.pastDueAmount || 0}
                       onChange={(e) => handleInputChange("pastDueAmount", parseFloat(e.target.value))}
-                      className="w-full"
                     />
                   ) : (
                     `$${entry.pastDueAmount.toFixed(2)}`
