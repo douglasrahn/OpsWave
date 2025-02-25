@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getCurrentClientId } from "@/lib/auth";
 
 interface TableEditorProps {
   tableName: string;
@@ -18,27 +19,10 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
-  // Define the order of fields for campaign entries based on the screenshot
-  const campaignEntryFields = [
-    'CompanyCity',
-    'CompanyName',
-    'CompanyPhone',
-    'CompanyState',
-    'CompanyZip',
-    'ContactFirstName',
-    'ContactLastName',
-    'ContactPhone',
-    'ID',
-    'Log',
-    'PastDueAmount',
-    'PreviousNotes',
-    'Status'
-  ];
-
-  // Get header fields based on the table type
-  const headers = tableName === 'campaign_entries' 
-    ? campaignEntryFields
-    : (data.length > 0 ? Object.keys(data[0]).filter(key => !['id'].includes(key)) : []);
+  // Get header fields from the first row of data, excluding internal fields
+  const headers = data.length > 0 
+    ? Object.keys(data[0]).filter(key => !['id', 'clientId'].includes(key))
+    : [];
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
@@ -52,7 +36,22 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleSave = async (id: string) => {
     try {
-      const docRef = doc(db, 'campaigns', id);
+      const clientId = getCurrentClientId();
+      if (!clientId) {
+        throw new Error("No client ID found");
+      }
+
+      let docRef;
+      if (tableName === 'campaign_entries') {
+        // Find the campaign ID from the data
+        const entry = data.find(entry => entry.id === id);
+        if (!entry?.campaignId) {
+          throw new Error("Campaign ID not found");
+        }
+        docRef = doc(db, `clients/${clientId}/campaigns/${entry.campaignId}/entries`, id);
+      } else {
+        docRef = doc(db, tableName, id);
+      }
 
       const updateData = { ...editedData };
       delete updateData.id; // Remove id from update data
@@ -67,29 +66,30 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
       setEditingRow(null);
       setEditedData(null);
-      onRefresh();
+      onRefresh(); // Refresh the data
     } catch (error) {
       console.error("Error updating document:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update record",
+        description: "Failed to update record",
         variant: "destructive"
       });
     }
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setEditedData(prev => ({
+    setEditedData((prev: Record<string, any> | null) => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const formatFieldValue = (value: any) => {
-    if (value === null || value === undefined) return 'Not Set';
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (typeof value === 'number') return value.toString();
-    return value;
+  // Format field names for display
+  const formatFieldName = (field: string) => {
+    return field
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
   };
 
   return (
@@ -98,8 +98,9 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Actions</TableHead>
+            <TableHead className="w-[80px]">ID</TableHead>
             {headers.map(header => (
-              <TableHead key={header}>{header}</TableHead>
+              <TableHead key={header}>{formatFieldName(header)}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -134,6 +135,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                   </Button>
                 )}
               </TableCell>
+              <TableCell>{row.id}</TableCell>
               {headers.map(header => (
                 <TableCell key={`${row.id}-${header}`}>
                   {editingRow === row.id ? (
@@ -143,7 +145,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                       className="min-w-[120px]"
                     />
                   ) : (
-                    formatFieldValue(row[header])
+                    row[header] === undefined ? 'Not Set' : row[header]
                   )}
                 </TableCell>
               ))}

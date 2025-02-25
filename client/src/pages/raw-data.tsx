@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FileSpreadsheet } from "lucide-react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
+import { collection, getDocs, query, collectionGroup, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCurrentClientId } from "@/lib/auth";
 
@@ -21,6 +21,18 @@ const TABLES = [
     name: "Campaign Entries", 
     icon: FileSpreadsheet,
     description: "Individual campaign contact records and status"
+  },
+  { 
+    id: "clients", 
+    name: "Clients", 
+    icon: Users,
+    description: "Client organization information"
+  },
+  { 
+    id: "scenarios", 
+    name: "Scenarios", 
+    icon: Settings,
+    description: "Automation scenario configurations"
   }
 ];
 
@@ -38,27 +50,20 @@ export default function RawDataPage() {
         throw new Error("No client ID found");
       }
 
-      console.log(`Fetching data for table: ${tableName}`);
       let data: any[] = [];
 
       if (tableName === 'campaign_entries') {
-        // Query for campaign entries (documents with entry-specific fields)
+        // Use collectionGroup to query all entries across all campaigns for this client
         const entriesQuery = query(
-          collection(db, "campaigns"),
-          where("clientId", "==", clientId),
-          where("CompanyName", "!=", null) // Filter for entry documents
+          collectionGroup(db, 'entries'),
+          where('clientId', '==', clientId)
         );
-
-        console.log("Executing campaign entries query");
         const querySnapshot = await getDocs(entriesQuery);
-        console.log(`Found ${querySnapshot.docs.length} campaign entries`);
-
         data = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
       } else {
-        // Original campaigns query
         const querySnapshot = await getDocs(collection(db, tableName));
         data = querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -66,14 +71,13 @@ export default function RawDataPage() {
         }));
       }
 
-      console.log(`Fetched ${data.length} records`);
       setTableData(data);
       setSelectedTable(tableName);
     } catch (error) {
       console.error("Error fetching table data:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to fetch table data",
+        description: "Failed to fetch table data",
         variant: "destructive"
       });
     } finally {
@@ -92,7 +96,7 @@ export default function RawDataPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Raw Data Editor</h1>
         <p className="text-muted-foreground mt-2">
-          Administrative interface for managing data
+          Administrative interface for managing database tables
         </p>
       </div>
 

@@ -5,10 +5,7 @@ export async function createTestCampaignEntry() {
   try {
     const clientId = "0";
     const campaignId = "VxC45m8tOpfYRh7uhQOJ";
-
-    console.log(`Creating test campaign entry for client ${clientId} and campaign ${campaignId}`);
-    console.log(`Using Firestore path: /${clientId}/campaigns/${campaignId}/entries`);
-
+    
     const entryData = {
       campaignId,
       clientId,
@@ -31,7 +28,7 @@ export async function createTestCampaignEntry() {
     };
 
     const entryRef = await addDoc(
-      collection(db, clientId, "campaigns", campaignId, "entries"),
+      collection(db, `clients/${clientId}/campaigns/${campaignId}/entries`),
       entryData
     );
 
