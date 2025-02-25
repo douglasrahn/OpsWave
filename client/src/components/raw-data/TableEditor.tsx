@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc, collection } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getCurrentClientId } from "@/lib/auth";
 
 interface TableEditorProps {
   tableName: string;
@@ -19,10 +18,8 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
-  // Get header fields from the first row of data, excluding internal fields
-  const headers = data.length > 0 
-    ? Object.keys(data[0]).filter(key => !['id', 'clientId'].includes(key))
-    : [];
+  // Get header fields from the first row of data
+  const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
@@ -36,26 +33,9 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleSave = async (id: string) => {
     try {
-      const clientId = getCurrentClientId();
-      if (!clientId) {
-        throw new Error("No client ID found");
-      }
-
-      let docRef;
-      if (tableName === 'campaign_entries') {
-        // Find the campaign ID from the data
-        const entry = data.find(entry => entry.id === id);
-        if (!entry?.campaignId) {
-          throw new Error("Campaign ID not found");
-        }
-        docRef = doc(db, `clients/${clientId}/campaigns/${entry.campaignId}/entries`, id);
-      } else {
-        docRef = doc(db, tableName, id);
-      }
-
+      const docRef = doc(db, tableName, id);
       const updateData = { ...editedData };
       delete updateData.id; // Remove id from update data
-      updateData.updatedAt = new Date().toISOString();
 
       await updateDoc(docRef, updateData);
 
@@ -84,23 +64,14 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
     }));
   };
 
-  // Format field names for display
-  const formatFieldName = (field: string) => {
-    return field
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .trim();
-  };
-
   return (
-    <div className="rounded-md border overflow-x-auto">
+    <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">Actions</TableHead>
-            <TableHead className="w-[80px]">ID</TableHead>
+            <TableHead className="w-[50px]">Actions</TableHead>
             {headers.map(header => (
-              <TableHead key={header}>{formatFieldName(header)}</TableHead>
+              <TableHead key={header}>{header}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -135,17 +106,15 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                   </Button>
                 )}
               </TableCell>
-              <TableCell>{row.id}</TableCell>
               {headers.map(header => (
                 <TableCell key={`${row.id}-${header}`}>
                   {editingRow === row.id ? (
                     <Input
                       value={editedData?.[header] ?? ''}
                       onChange={(e) => handleInputChange(header, e.target.value)}
-                      className="min-w-[120px]"
                     />
                   ) : (
-                    row[header] === undefined ? 'Not Set' : row[header]
+                    row[header]
                   )}
                 </TableCell>
               ))}

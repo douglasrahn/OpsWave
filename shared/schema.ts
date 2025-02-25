@@ -52,7 +52,17 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   surveyScenarioId: true,
 });
 
+export const insertOAuthTokenSchema = createInsertSchema(oauthTokens).pick({
+  userId: true,
+  provider: true,
+  accessToken: true,
+  refreshToken: true,
+  expiresAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+export type InsertOAuthToken = z.infer<typeof insertOAuthTokenSchema>;
+export type OAuthToken = typeof oauthTokens.$inferSelect;
