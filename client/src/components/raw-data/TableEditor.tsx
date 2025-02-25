@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc, getDocs, collection, collectionGroup } from "firebase/firestore";
+import { doc, updateDoc, getDocs, collection, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CampaignDataEditor } from "./CampaignDataEditor";
 import { getCurrentClientId } from "@/lib/auth";
@@ -31,16 +31,27 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       );
     }
 
-    // For campaigndata, we need to fetch all entries from all campaigns
-    const fetchCampaignData = async () => {
-      const campaignsRef = collection(db, "campaigndata", clientId);
-      const campaignsSnapshot = await getDocs(campaignsRef);
+    // Get all campaigns for this client and their associated data
+    const fetchClientCampaignData = async () => {
+      // First get all campaigns for this client
+      const campaignsRef = collection(db, "campaigns");
+      const q = query(campaignsRef, where("clientID", "==", clientId));
+      const campaignsSnapshot = await getDocs(q);
 
       let allEntries = [];
+      // For each campaign, get its client data
       for (const campaignDoc of campaignsSnapshot.docs) {
-        const entriesRef = collection(campaignsRef, campaignDoc.id, 'entries');
-        const entriesSnapshot = await getDocs(entriesRef);
-        allEntries.push(...entriesSnapshot.docs.map(doc => doc.data()));
+        const campaignId = campaignDoc.id;
+        const clientDataRef = collection(db, `campaigndata/${campaignId}/clientdata`);
+        const clientDataSnapshot = await getDocs(clientDataRef);
+
+        // Get the client's data for this campaign
+        const clientData = clientDataSnapshot.docs
+          .find(doc => doc.id === clientId);
+
+        if (clientData) {
+          allEntries.push(clientData.data());
+        }
       }
 
       return allEntries;
@@ -55,7 +66,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
     );
   }
 
-  // Get header fields from the first row of data
+  // Handle regular tables
   const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
 
   const handleEdit = (row: Record<string, any>) => {

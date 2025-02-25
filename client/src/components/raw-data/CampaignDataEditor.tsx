@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { collection, doc, setDoc, deleteDoc, getDocs, query, collectionGroup } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -37,6 +37,17 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const [editedData, setEditedData] = useState<Partial<CampaignEntry>>({});
   const { toast } = useToast();
 
+  // First, get all campaigns for this client
+  const fetchCampaignsForClient = async () => {
+    const campaignsRef = collection(db, "campaigns");
+    const q = query(campaignsRef, where("clientID", "==", clientId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  };
+
   const handleEdit = (entry: CampaignEntry) => {
     setEditingId(entry.id);
     setEditedData(entry);
@@ -47,28 +58,21 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      // Get all campaign subcollections
-      const campaignsRef = collection(db, "campaigndata", clientId);
-      const campaignsSnapshot = await getDocs(campaignsRef);
+      // Get campaigns for this client
+      const campaigns = await fetchCampaignsForClient();
 
-      // Find the campaign containing this entry
-      for (const campaignDoc of campaignsSnapshot.docs) {
-        const entriesRef = collection(campaignsRef, campaignDoc.id, 'entries');
-        const entriesSnapshot = await getDocs(entriesRef);
-
-        const entryDoc = entriesSnapshot.docs.find(doc => {
-          const data = doc.data();
-          return data.id === editingId;
-        });
-
-        if (entryDoc) {
-          await setDoc(doc(db, "campaigndata", clientId, campaignDoc.id, 'entries', entryDoc.id), {
-            ...editedData,
-            id: editingId // Preserve the original ID
-          });
-          break;
-        }
+      // For now, we'll use the first campaign (you might want to add campaign selection)
+      if (campaigns.length === 0) {
+        throw new Error("No campaigns found for this client");
       }
+
+      const campaignId = campaigns[0].id;
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+
+      await setDoc(clientDataRef, {
+        ...editedData,
+        id: editingId // Preserve the original ID
+      });
 
       toast({
         title: "Changes saved successfully"
@@ -94,24 +98,14 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      // Find and delete the entry from the correct campaign subcollection
-      const campaignsRef = collection(db, "campaigndata", clientId);
-      const campaignsSnapshot = await getDocs(campaignsRef);
-
-      for (const campaignDoc of campaignsSnapshot.docs) {
-        const entriesRef = collection(campaignsRef, campaignDoc.id, 'entries');
-        const entriesSnapshot = await getDocs(entriesRef);
-
-        const entryDoc = entriesSnapshot.docs.find(doc => {
-          const data = doc.data();
-          return data.id === entry.id;
-        });
-
-        if (entryDoc) {
-          await deleteDoc(doc(db, "campaigndata", clientId, campaignDoc.id, 'entries', entryDoc.id));
-          break;
-        }
+      const campaigns = await fetchCampaignsForClient();
+      if (campaigns.length === 0) {
+        throw new Error("No campaigns found for this client");
       }
+
+      const campaignId = campaigns[0].id;
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+      await deleteDoc(clientDataRef);
 
       toast({
         title: "Entry deleted successfully"
@@ -133,21 +127,16 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const handleAdd = async () => {
     setIsLoading(true);
     try {
-      // Get the active campaign ID (for now, just use the first campaign)
-      const campaignsRef = collection(db, "campaigndata", clientId);
-      const campaignsSnapshot = await getDocs(campaignsRef);
-
-      if (campaignsSnapshot.empty) {
+      const campaigns = await fetchCampaignsForClient();
+      if (campaigns.length === 0) {
         throw new Error("No campaigns found for this client");
       }
 
-      const campaignId = campaignsSnapshot.docs[0].id;
-      const entriesRef = collection(campaignsRef, campaignId, 'entries');
-      const entriesSnapshot = await getDocs(entriesRef);
+      const campaignId = campaigns[0].id;
+      const clientDataRef = collection(db, `campaigndata/${campaignId}/clientdata`);
 
-      // Find the next available ID (starting from 0)
-      const nextId = entriesSnapshot.empty ? 0 : 
-        Math.max(...entriesSnapshot.docs.map(doc => doc.data().id)) + 1;
+      // Calculate next ID based on existing entries
+      const nextId = data.length > 0 ? Math.max(...data.map(entry => entry.id)) + 1 : 0;
 
       const newEntry: CampaignEntry = {
         id: nextId,
@@ -167,7 +156,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         log: ""
       };
 
-      await setDoc(doc(entriesRef), newEntry);
+      await setDoc(doc(clientDataRef, clientId), newEntry);
 
       toast({
         title: "New entry added successfully"
