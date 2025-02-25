@@ -2,15 +2,13 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { doc, setDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, getDocs, query, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 
 interface CampaignEntry {
   id: number;
-  clientId: string;
-  campaignId: string;
   status: string;
   contactFirstName: string;
   contactLastName: string;
@@ -49,11 +47,28 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      const docRef = doc(db, "campaigndata", `${clientId}_${editingId}`);
-      await setDoc(docRef, {
-        ...editedData,
-        clientId // Ensure clientId is included
-      });
+      // Get all campaign subcollections
+      const campaignsRef = collection(db, "campaigndata", clientId);
+      const campaignsSnapshot = await getDocs(campaignsRef);
+
+      // Find the campaign containing this entry
+      for (const campaignDoc of campaignsSnapshot.docs) {
+        const entriesRef = collection(campaignsRef, campaignDoc.id, 'entries');
+        const entriesSnapshot = await getDocs(entriesRef);
+
+        const entryDoc = entriesSnapshot.docs.find(doc => {
+          const data = doc.data();
+          return data.id === editingId;
+        });
+
+        if (entryDoc) {
+          await setDoc(doc(db, "campaigndata", clientId, campaignDoc.id, 'entries', entryDoc.id), {
+            ...editedData,
+            id: editingId // Preserve the original ID
+          });
+          break;
+        }
+      }
 
       toast({
         title: "Changes saved successfully"
@@ -79,8 +94,24 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      const docRef = doc(db, "campaigndata", `${clientId}_${entry.id}`);
-      await deleteDoc(docRef);
+      // Find and delete the entry from the correct campaign subcollection
+      const campaignsRef = collection(db, "campaigndata", clientId);
+      const campaignsSnapshot = await getDocs(campaignsRef);
+
+      for (const campaignDoc of campaignsSnapshot.docs) {
+        const entriesRef = collection(campaignsRef, campaignDoc.id, 'entries');
+        const entriesSnapshot = await getDocs(entriesRef);
+
+        const entryDoc = entriesSnapshot.docs.find(doc => {
+          const data = doc.data();
+          return data.id === entry.id;
+        });
+
+        if (entryDoc) {
+          await deleteDoc(doc(db, "campaigndata", clientId, campaignDoc.id, 'entries', entryDoc.id));
+          break;
+        }
+      }
 
       toast({
         title: "Entry deleted successfully"
@@ -102,16 +133,24 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const handleAdd = async () => {
     setIsLoading(true);
     try {
-      // Find the next available ID
-      const campaigndataRef = collection(db, "campaigndata");
-      const q = query(campaigndataRef, where("clientId", "==", clientId));
-      const querySnapshot = await getDocs(q);
-      const nextId = querySnapshot.empty ? 1 : Math.max(...querySnapshot.docs.map(doc => parseInt(doc.id.split('_')[1], 10))) + 1;
+      // Get the active campaign ID (for now, just use the first campaign)
+      const campaignsRef = collection(db, "campaigndata", clientId);
+      const campaignsSnapshot = await getDocs(campaignsRef);
+
+      if (campaignsSnapshot.empty) {
+        throw new Error("No campaigns found for this client");
+      }
+
+      const campaignId = campaignsSnapshot.docs[0].id;
+      const entriesRef = collection(campaignsRef, campaignId, 'entries');
+      const entriesSnapshot = await getDocs(entriesRef);
+
+      // Find the next available ID (starting from 0)
+      const nextId = entriesSnapshot.empty ? 0 : 
+        Math.max(...entriesSnapshot.docs.map(doc => doc.data().id)) + 1;
 
       const newEntry: CampaignEntry = {
         id: nextId,
-        clientId,
-        campaignId: "",
         status: "new",
         contactFirstName: "",
         contactLastName: "",
@@ -128,8 +167,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         log: ""
       };
 
-      const docRef = doc(db, "campaigndata", `${clientId}_${nextId}`);
-      await setDoc(docRef, newEntry);
+      await setDoc(doc(entriesRef), newEntry);
 
       toast({
         title: "New entry added successfully"
@@ -148,7 +186,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
     }
   };
 
-  const handleInputChange = (field: keyof CampaignEntry, value: string | number) => {
+  const handleInputChange = (field: keyof CampaignEntry, value: string | number | null) => {
     setEditedData(prev => ({
       ...prev,
       [field]: value
@@ -170,7 +208,6 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
-              <TableHead>Campaign ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Contact Info</TableHead>
               <TableHead>Company Info</TableHead>
@@ -182,16 +219,6 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
             {data.map((entry) => (
               <TableRow key={entry.id}>
                 <TableCell>{entry.id}</TableCell>
-                <TableCell>
-                  {editingId === entry.id ? (
-                    <Input
-                      value={editedData.campaignId || ""}
-                      onChange={(e) => handleInputChange("campaignId", e.target.value)}
-                    />
-                  ) : (
-                    entry.campaignId || "Not Set"
-                  )}
-                </TableCell>
                 <TableCell>
                   {editingId === entry.id ? (
                     <Input

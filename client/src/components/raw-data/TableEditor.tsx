@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDocs, collection, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CampaignDataEditor } from "./CampaignDataEditor";
 import { getCurrentClientId } from "@/lib/auth";
@@ -30,6 +30,21 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
         </div>
       );
     }
+
+    // For campaigndata, we need to fetch all entries from all campaigns
+    const fetchCampaignData = async () => {
+      const campaignsRef = collection(db, "campaigndata", clientId);
+      const campaignsSnapshot = await getDocs(campaignsRef);
+
+      let allEntries = [];
+      for (const campaignDoc of campaignsSnapshot.docs) {
+        const entriesRef = collection(campaignsRef, campaignDoc.id, 'entries');
+        const entriesSnapshot = await getDocs(entriesRef);
+        allEntries.push(...entriesSnapshot.docs.map(doc => doc.data()));
+      }
+
+      return allEntries;
+    };
 
     return (
       <CampaignDataEditor
