@@ -51,7 +51,11 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       const docRef = doc(db, "campaigndata", clientId);
       const docSnap = await getDoc(docRef);
       const currentData = docSnap.data();
-      
+
+      if (!currentData?.entries) {
+        throw new Error("No entries found in document");
+      }
+
       // Update the specific entry in the array
       const updatedEntries = currentData.entries.map((entry: CampaignEntry) =>
         entry.id === editingId ? { ...entry, ...editedData } : entry
@@ -113,7 +117,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       const docRef = doc(db, "campaigndata", clientId);
       const docSnap = await getDoc(docRef);
       const currentData = docSnap.data();
-      
+
       // Calculate next ID
       const currentEntries = currentData?.entries || [];
       const nextId = currentEntries.length > 0 
