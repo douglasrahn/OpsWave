@@ -4,7 +4,7 @@ import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Database, FileSpreadsheet, Users, Settings } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, collectionGroup, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCurrentClientId } from "@/lib/auth";
 
@@ -17,7 +17,7 @@ const TABLES = [
     description: "Campaign configurations and basic info"
   },
   { 
-    id: "campaigndata", 
+    id: "campaign_entries", 
     name: "Campaign Entries", 
     icon: FileSpreadsheet,
     description: "Individual campaign contact records and status"
@@ -50,25 +50,20 @@ export default function RawDataPage() {
         throw new Error("No client ID found");
       }
 
-      console.log(`[RawData] Fetching data for table: ${tableName}, clientId: ${clientId}`);
-
       let data: any[] = [];
 
-      if (tableName === 'campaigndata') {
-        // Fetch campaign entries from the client's campaigndata collection
-        console.log(`[RawData] Fetching entries from: campaigndata/${clientId}/entries`);
-        const entriesSnapshot = await getDocs(collection(db, `campaigndata/${clientId}/entries`));
-        console.log(`[RawData] Found ${entriesSnapshot.docs.length} entries`);
-
-        data = entriesSnapshot.docs.map(doc => {
-          const docData = doc.data();
-          console.log(`[RawData] Processing entry:`, docData);
-          return docData;
-        });
-
-        console.log(`[RawData] Processed campaign entries:`, data);
+      if (tableName === 'campaign_entries') {
+        // Use collectionGroup to query all entries across all campaigns for this client
+        const entriesQuery = query(
+          collectionGroup(db, 'entries'),
+          where('clientId', '==', clientId)
+        );
+        const querySnapshot = await getDocs(entriesQuery);
+        data = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       } else {
-        // For other collections, fetch normally
         const querySnapshot = await getDocs(collection(db, tableName));
         data = querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -79,7 +74,7 @@ export default function RawDataPage() {
       setTableData(data);
       setSelectedTable(tableName);
     } catch (error) {
-      console.error(`[RawData] Error fetching table data:`, error);
+      console.error("Error fetching table data:", error);
       toast({
         title: "Error",
         description: "Failed to fetch table data",

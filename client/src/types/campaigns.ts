@@ -1,5 +1,5 @@
 export interface CampaignEntry {
-  id: number;
+  id: string;
   campaignId: string;
   status: 'pending' | 'in-progress' | 'completed' | 'failed';
   contactFirstName: string | null;
