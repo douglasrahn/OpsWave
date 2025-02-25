@@ -31,37 +31,45 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       );
     }
 
-    // Get campaign for this client
-    const fetchCampaignForClient = async () => {
+    // For each campaign associated with this client, get the client data
+    const fetchClientData = async () => {
       try {
-        console.log("Looking up client for email:", clientId);
+        console.log("Looking up client:", clientId);
 
-        // Query campaigns collection to get client ID for this user's email
+        // Query campaigns for this client
         const campaignsRef = collection(db, "campaigns");
-        const q = query(campaignsRef, where("clientID", "==", clientId));
+        const q = query(campaignsRef, where("clientId", "==", clientId));
         const campaignSnapshot = await getDocs(q);
 
         if (campaignSnapshot.empty) {
-          console.log("No campaign found for client:", clientId);
-          throw new Error("No campaign found for this client");
-        }
-
-        const campaignDoc = campaignSnapshot.docs[0];
-        const campaignId = campaignDoc.id;
-        console.log("Found campaign ID:", campaignId);
-
-        // Get client data for this campaign
-        const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-        const clientDataSnap = await getDoc(clientDataRef);
-
-        if (!clientDataSnap.exists()) {
-          console.log("No client data found for campaign:", campaignId);
+          console.log("No campaigns found for client:", clientId);
           return [];
         }
 
-        return clientDataSnap.data().entries || [];
+        const allEntries = [];
+        // For each campaign, get its client data
+        for (const campaignDoc of campaignSnapshot.docs) {
+          const campaignId = campaignDoc.id;
+          console.log("Processing campaign:", campaignId);
+
+          const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+          const clientDataSnap = await getDoc(clientDataRef);
+
+          if (clientDataSnap.exists()) {
+            const entries = clientDataSnap.data().entries || [];
+            // Add campaignId to each entry
+            const entriesWithCampaignId = entries.map((entry: any) => ({
+              ...entry,
+              campaignId
+            }));
+            allEntries.push(...entriesWithCampaignId);
+          }
+        }
+
+        console.log("Total entries found:", allEntries.length);
+        return allEntries;
       } catch (error) {
-        console.error("Error fetching campaign data:", error);
+        console.error("Error fetching client data:", error);
         throw error;
       }
     };

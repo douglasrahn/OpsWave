@@ -23,6 +23,7 @@ interface CampaignEntry {
   pastDueAmount: number | null;
   previousNotes: string;
   log: string;
+  campaignId?: string;
 }
 
 interface Props {
@@ -37,27 +38,8 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const [editedData, setEditedData] = useState<Partial<CampaignEntry>>({});
   const { toast } = useToast();
 
-  // Get campaign for this client
-  const fetchCampaignForClient = async () => {
-    try {
-      console.log("Fetching campaign for client:", clientId);
-      const campaignsRef = collection(db, "campaigns");
-      const q = query(campaignsRef, where("clientID", "==", clientId));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        throw new Error("No campaigns found for this client");
-      }
-
-      // For now, use the first campaign
-      return querySnapshot.docs[0];
-    } catch (error) {
-      console.error("Error fetching campaign:", error);
-      throw error;
-    }
-  };
-
   const handleEdit = (entry: CampaignEntry) => {
+    console.log("Editing entry:", entry);
     setEditingId(entry.id);
     setEditedData(entry);
   };
@@ -67,37 +49,55 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      console.log("Starting save operation for entry ID:", editingId);
+      // Find the entry we're editing
+      console.log("Looking for entry with ID:", editingId);
+      console.log("Available entries:", data);
 
-      // Get campaign document
-      const campaignDoc = await fetchCampaignForClient();
-      const campaignId = campaignDoc.id;
-      console.log("Found campaign ID:", campaignId);
+      const entry = data.find(e => e.id === editingId);
+      console.log("Found entry:", entry);
 
-      // Reference to the client's data document within this campaign
-      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-
-      // Get current document data
-      const docSnap = await getDoc(clientDataRef);
-      console.log("Current document exists:", docSnap.exists());
-
-      const entries = docSnap.exists() ? docSnap.data().entries || [] : [];
-      console.log("Current entries:", entries);
-
-      // Update the specific entry in the entries array
-      const updatedEntries = entries.map((entry: CampaignEntry) =>
-        entry.id === editingId ? { ...entry, ...editedData } : entry
-      );
-
-      // If entry wasn't found, add it
-      if (!entries.find((entry: CampaignEntry) => entry.id === editingId)) {
-        console.log("Entry not found, adding new entry");
-        updatedEntries.push({ ...editedData, id: editingId });
+      if (!entry?.campaignId) {
+        console.error("No campaignId found for entry:", entry);
+        throw new Error("Could not find campaign ID for this entry");
       }
 
-      console.log("Saving updated entries:", updatedEntries);
+      console.log("Starting save operation", {
+        editingId,
+        campaignId: entry.campaignId,
+        clientId,
+        editedData
+      });
 
-      // Save the updated entries array back to the document
+      // Reference to the client's data document within this campaign
+      const clientDataRef = doc(db, `campaigndata/${entry.campaignId}/clientdata`, clientId);
+      const docSnap = await getDoc(clientDataRef);
+
+      // Get current entries array or initialize empty array if none exists
+      const currentEntries = docSnap.exists() ? (docSnap.data().entries || []) : [];
+      console.log("Current entries in Firestore:", currentEntries);
+
+      // Update or add the entry
+      let updated = false;
+      const updatedEntries = currentEntries.map((e: CampaignEntry) => {
+        if (e.id === editingId) {
+          updated = true;
+          const updatedEntry = { ...e, ...editedData, campaignId: entry.campaignId };
+          console.log("Updating existing entry:", updatedEntry);
+          return updatedEntry;
+        }
+        return e;
+      });
+
+      // If entry wasn't found in array, add it
+      if (!updated) {
+        const newEntry = { ...editedData, id: editingId, campaignId: entry.campaignId };
+        console.log("Adding new entry:", newEntry);
+        updatedEntries.push(newEntry);
+      }
+
+      console.log("Final entries array:", updatedEntries);
+
+      // Save back to Firestore
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
       toast({
@@ -129,24 +129,25 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      console.log("Starting delete operation for entry ID:", entry.id);
+      if (!entry.campaignId) {
+        throw new Error("No campaign ID found for this entry");
+      }
 
-      const campaignDoc = await fetchCampaignForClient();
-      const campaignId = campaignDoc.id;
-      console.log("Found campaign ID:", campaignId);
+      console.log("Starting delete operation", {
+        entryId: entry.id,
+        campaignId: entry.campaignId,
+        clientId
+      });
 
-      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+      const clientDataRef = doc(db, `campaigndata/${entry.campaignId}/clientdata`, clientId);
       const docSnap = await getDoc(clientDataRef);
 
       if (!docSnap.exists()) {
         throw new Error("No entries found");
       }
 
-      const entries = docSnap.data().entries || [];
-      console.log("Current entries before delete:", entries);
-
-      const updatedEntries = entries.filter((e: CampaignEntry) => e.id !== entry.id);
-      console.log("Updated entries after delete:", updatedEntries);
+      const currentEntries = docSnap.data().entries || [];
+      const updatedEntries = currentEntries.filter((e: CampaignEntry) => e.id !== entry.id);
 
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
@@ -170,20 +171,26 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
   const handleAdd = async () => {
     setIsLoading(true);
     try {
-      console.log("Starting add operation");
+      // For new entries, use the campaign from existing entries
+      let campaignId;
+      if (data.length > 0 && data[0].campaignId) {
+        campaignId = data[0].campaignId;
+      } else {
+        throw new Error("No existing campaign found to add entry to");
+      }
 
-      const campaignDoc = await fetchCampaignForClient();
-      const campaignId = campaignDoc.id;
-      console.log("Found campaign ID:", campaignId);
+      console.log("Starting add operation", {
+        campaignId,
+        clientId
+      });
 
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
       const docSnap = await getDoc(clientDataRef);
-      const entries = docSnap.exists() ? docSnap.data().entries || [] : [];
-      console.log("Current entries:", entries);
+      const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
 
       // Calculate next ID
-      const nextId = entries.length > 0 ? Math.max(...entries.map((e: CampaignEntry) => e.id)) + 1 : 0;
-      console.log("Next ID calculated:", nextId);
+      const nextId = currentEntries.length > 0 ? 
+        Math.max(...currentEntries.map((e: CampaignEntry) => e.id)) + 1 : 0;
 
       const newEntry: CampaignEntry = {
         id: nextId,
@@ -200,12 +207,15 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         companyPhone: "",
         pastDueAmount: null,
         previousNotes: "",
-        log: ""
+        log: "",
+        campaignId
       };
+
+      console.log("Adding new entry:", newEntry);
 
       // Add new entry to existing entries array
       await setDoc(clientDataRef, {
-        entries: [...entries, newEntry]
+        entries: [...currentEntries, newEntry]
       }, { merge: true });
 
       toast({
@@ -289,8 +299,8 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                     </div>
                   ) : (
                     <div>
-                      <div>{entry.contactFirstName && entry.contactLastName ? 
-                        `${entry.contactFirstName} ${entry.contactLastName}`.trim() : 
+                      <div>{entry.contactFirstName && entry.contactLastName ?
+                        `${entry.contactFirstName} ${entry.contactLastName}`.trim() :
                         "Not Set"}</div>
                       <div className="text-sm text-muted-foreground">
                         {entry.contactPhone || "No Phone"}
@@ -374,7 +384,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
                   <div className="flex space-x-2">
                     {editingId === entry.id ? (
                       <>
-                        <Button 
+                        <Button
                           onClick={handleSave}
                           disabled={isLoading}
                         >
