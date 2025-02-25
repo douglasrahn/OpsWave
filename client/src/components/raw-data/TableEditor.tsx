@@ -31,13 +31,10 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       );
     }
 
-    // Filter entries for current client
-    const clientEntries = data.filter(entry => entry.clientId === clientId);
-
     return (
       <CampaignDataEditor
         clientId={clientId}
-        data={clientEntries}
+        data={data}
         onRefresh={onRefresh}
       />
     );
