@@ -18,29 +18,26 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
-  // Define the order of fields for campaign entries
+  // Define the order of fields for campaign entries based on the screenshot
   const campaignEntryFields = [
-    'id',
-    'campaignId',
-    'status',
-    'contactFirstName',
-    'contactLastName',
-    'contactPhone',
-    'companyName',
-    'companyAddress1',
-    'companyAddress2',
-    'companyCity',
-    'companyState',
-    'companyZip',
-    'companyPhone',
-    'pastDueAmount',
-    'previousNotes',
-    'log'
+    'CompanyCity',
+    'CompanyName',
+    'CompanyPhone',
+    'CompanyState',
+    'CompanyZip',
+    'ContactFirstName',
+    'ContactLastName',
+    'ContactPhone',
+    'ID',
+    'Log',
+    'PastDueAmount',
+    'PreviousNotes',
+    'Status'
   ];
 
-  // Get header fields from the first row of data, excluding internal fields
+  // Get header fields based on the table type
   const headers = tableName === 'campaign_entries' 
-    ? campaignEntryFields.filter(field => field !== 'id')
+    ? campaignEntryFields
     : (data.length > 0 ? Object.keys(data[0]).filter(key => !['id'].includes(key)) : []);
 
   const handleEdit = (row: Record<string, any>) => {
@@ -55,8 +52,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleSave = async (id: string) => {
     try {
-      // For campaign entries, update directly in the campaigns collection
-      const docRef = doc(db, tableName === 'campaign_entries' ? 'campaigns' : tableName, id);
+      const docRef = doc(db, 'campaigns', id);
 
       const updateData = { ...editedData };
       delete updateData.id; // Remove id from update data
@@ -71,7 +67,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
       setEditingRow(null);
       setEditedData(null);
-      onRefresh(); // Refresh the data
+      onRefresh();
     } catch (error) {
       console.error("Error updating document:", error);
       toast({
@@ -89,15 +85,6 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
     }));
   };
 
-  // Format field names for display
-  const formatFieldName = (field: string) => {
-    return field
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .trim();
-  };
-
-  // Format field value for display
   const formatFieldValue = (value: any) => {
     if (value === null || value === undefined) return 'Not Set';
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
@@ -112,7 +99,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
           <TableRow>
             <TableHead className="w-[100px]">Actions</TableHead>
             {headers.map(header => (
-              <TableHead key={header}>{formatFieldName(header)}</TableHead>
+              <TableHead key={header}>{header}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
