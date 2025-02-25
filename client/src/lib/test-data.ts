@@ -5,10 +5,10 @@ export async function createTestCampaignEntry() {
   try {
     const clientId = "0";
     const campaignId = "VxC45m8tOpfYRh7uhQOJ";
-    
+
     const entryData = {
       campaignId,
-      clientId,
+      id: 1, // First entry
       status: "pending",
       contactFirstName: "John",
       contactLastName: "Doe",
@@ -28,7 +28,7 @@ export async function createTestCampaignEntry() {
     };
 
     const entryRef = await addDoc(
-      collection(db, `clients/${clientId}/campaigns/${campaignId}/entries`),
+      collection(db, `campaigndata/${clientId}/entries`),
       entryData
     );
 
