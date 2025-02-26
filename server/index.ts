@@ -38,30 +38,78 @@ async function startServer() {
       res.status(500).json({ error: 'Internal Server Error' });
     });
 
-    // Wrap server.listen in a promise to handle both success and failure
-    await new Promise<void>((resolve, reject) => {
-      console.log(`Attempting to start server on port ${PORT}...`);
-
-      server.listen(PORT, '0.0.0.0')
-        .once('listening', () => {
-          console.log(`Server running at http://0.0.0.0:${PORT}`);
+    // Function to forcefully close server if needed
+    const forceCloseServer = () => {
+      return new Promise<void>((resolve) => {
+        if (server.listening) {
+          console.log('Force closing existing server...');
+          server.close(() => {
+            console.log('Server closed');
+            resolve();
+          });
+          // Force close any remaining connections
+          setTimeout(() => {
+            resolve();
+          }, 1000);
+        } else {
           resolve();
-        })
-        .once('error', (err: any) => {
-          if (err.code === 'EADDRINUSE') {
-            console.error(`Port ${PORT} is already in use. Attempting to close existing connection...`);
-            server.close();
-            server.listen(PORT, '0.0.0.0');
-          } else {
-            console.error('Server failed to start:', err);
-            reject(err);
-          }
+        }
+      });
+    };
+
+    // Handle server shutdown gracefully
+    const cleanup = async () => {
+      console.log('Shutting down server...');
+      await forceCloseServer();
+      process.exit(0);
+    };
+
+    process.on('SIGTERM', cleanup);
+    process.on('SIGINT', cleanup);
+
+    let retries = 0;
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+
+    while (retries < maxRetries) {
+      try {
+        // Ensure the server is not already listening
+        await forceCloseServer();
+
+        await new Promise<void>((resolve, reject) => {
+          // Clear any existing error handlers
+          server.removeAllListeners('error');
+
+          server.listen(PORT, '0.0.0.0')
+            .once('listening', () => {
+              console.log(`Server running at http://0.0.0.0:${PORT}`);
+              resolve();
+            })
+            .once('error', (err: any) => {
+              console.error(`Server error on attempt ${retries + 1}:`, err);
+              if (err.code === 'EADDRINUSE') {
+                console.log(`Port ${PORT} is in use, attempting to close existing connection...`);
+                reject(err);
+              } else {
+                console.error('Server failed to start:', err);
+                reject(err);
+              }
+            });
         });
-    });
+        break; // If successful, exit the retry loop
+      } catch (err) {
+        retries++;
+        if (retries === maxRetries) {
+          console.error(`Failed to start server after ${maxRetries} attempts`);
+          throw err;
+        }
+        console.log(`Retrying in ${retryDelay}ms... (Attempt ${retries} of ${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
 
   } catch (error) {
     console.error('Failed to start server:', error);
-    // Exit with error code to trigger workflow restart
     process.exit(1);
   }
 }
