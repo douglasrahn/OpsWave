@@ -31,6 +31,19 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const { toast } = useToast();
   const currentClientId = getCurrentClientId();
 
+  // Process data to handle nested objects
+  const processValue = (value: any): string => {
+    if (Array.isArray(value)) {
+      return value.map(item => 
+        typeof item === 'object' ? JSON.stringify(item) : item
+      ).join(', ');
+    }
+    if (value && typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    return value?.toString() ?? '';
+  };
+
   // Handle regular tables
   const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
 
@@ -59,7 +72,14 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
     try {
       if (tableName === "clients") {
-        clientSchema.parse(editedData);
+        // Parse JSON strings back to objects for validation
+        const processedData = {
+          ...editedData,
+          users: typeof editedData.users === 'string' 
+            ? JSON.parse(editedData.users)
+            : editedData.users
+        };
+        clientSchema.parse(processedData);
       }
       return true;
     } catch (error) {
@@ -68,6 +88,12 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
         toast({
           title: "Validation Error",
           description: issues,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Invalid JSON format in users field",
           variant: "destructive"
         });
       }
@@ -79,13 +105,20 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
     if (!validateData()) return;
 
     try {
-      // Send update to backend
+      // Parse JSON strings back to objects before sending
+      const processedData = {
+        ...editedData,
+        users: typeof editedData?.users === 'string'
+          ? JSON.parse(editedData.users)
+          : editedData?.users
+      };
+
       const response = await fetch(`/api/${tableName}/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editedData),
+        body: JSON.stringify(processedData),
       });
 
       if (!response.ok) {
@@ -111,7 +144,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setEditedData((prev: Record<string, any> | null) => ({
+    setEditedData(prev => ({
       ...prev,
       [field]: value
     }));
@@ -163,11 +196,11 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
                 <TableCell key={`${row.id}-${header}`}>
                   {editingRow === row.id ? (
                     <Input
-                      value={editedData?.[header] ?? ''}
+                      value={editedData?.[header] ? processValue(editedData[header]) : ''}
                       onChange={(e) => handleInputChange(header, e.target.value)}
                     />
                   ) : (
-                    row[header]
+                    processValue(row[header])
                   )}
                 </TableCell>
               ))}
