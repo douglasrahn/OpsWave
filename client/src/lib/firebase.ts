@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentSingleTabManager } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -27,15 +26,8 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Authentication
 export const auth = getAuth(app);
 
-// Initialize Firestore with persistent cache
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentSingleTabManager({}) 
-  })
-});
-
-// Initialize the database with basic configuration only
-export async function initializeDatabase() {
+// Initialize the auth state
+export async function initializeAuth() {
   try {
     console.log("Starting Firebase initialization...");
     console.log("Firebase initialized successfully");

@@ -1,0 +1,16 @@
+{
+  "clients": [
+    {
+      "clientId": "0",
+      "companyName": "Blue Island",
+      "url": "blueisland.ai",
+      "users": [
+        {
+          "email": "drahn@blueisland.ai",
+          "role": "admin",
+          "uid": "tgsdN0Kd0yczogLWqlsVGrhk4a33"
+        }
+      ]
+    }
+  ]
+}
