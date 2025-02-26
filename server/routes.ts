@@ -3,13 +3,16 @@ import fetch from 'node-fetch';
 
 const MAKE_API_KEY = process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
+const MAKE_ORG_ID = '493039';
 
 export function registerRoutes(app: Express) {
   // Get scenario status
   app.get('/api/scenarios/:scenarioId', async (req, res) => {
     try {
       const { scenarioId } = req.params;
-      const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, {
+      console.log(`Making request to Make.com API for scenario ${scenarioId}`);
+
+      const response = await fetch(`${MAKE_API_BASE_URL}/organizations/${MAKE_ORG_ID}/scenarios/${scenarioId}`, {
         headers: {
           'Authorization': `Token ${MAKE_API_KEY}`,
           'Content-Type': 'application/json'
@@ -17,8 +20,15 @@ export function registerRoutes(app: Express) {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Make.com API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
         return res.status(response.status).json({
-          error: 'Failed to fetch scenario status'
+          error: 'Failed to fetch scenario status',
+          details: errorText
         });
       }
 
@@ -43,7 +53,9 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`, {
+      console.log(`Making ${action} request to Make.com API for scenario ${scenarioId}`);
+
+      const response = await fetch(`${MAKE_API_BASE_URL}/organizations/${MAKE_ORG_ID}/scenarios/${scenarioId}/${action}`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${MAKE_API_KEY}`,
@@ -52,8 +64,15 @@ export function registerRoutes(app: Express) {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Make.com API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
         return res.status(response.status).json({
-          error: `Failed to ${action} scenario`
+          error: `Failed to ${action} scenario`,
+          details: errorText
         });
       }
 
