@@ -1,0 +1,16 @@
+{
+  "clients": [
+    {
+      "clientId": "client1",
+      "companyName": "Test Company Inc",
+      "url": "https://testcompany.com",
+      "users": [
+        {
+          "email": "test@example.com",
+          "role": "admin",
+          "uid": "test123"
+        }
+      ]
+    }
+  ]
+}
