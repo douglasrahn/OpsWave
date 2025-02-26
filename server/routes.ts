@@ -8,13 +8,6 @@ export function registerRoutes(app: Express) {
   // Get scenario status
   app.get('/api/scenarios/:scenarioId', async (req, res) => {
     try {
-      if (!MAKE_API_KEY) {
-        console.error('Make.com API key not found in environment');
-        return res.status(500).json({
-          error: 'Make.com API key not configured'
-        });
-      }
-
       const { scenarioId } = req.params;
       const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, {
         headers: {
@@ -42,13 +35,6 @@ export function registerRoutes(app: Express) {
   // Toggle scenario status
   app.post('/api/scenarios/:scenarioId/:action', async (req, res) => {
     try {
-      if (!MAKE_API_KEY) {
-        console.error('Make.com API key not found in environment');
-        return res.status(500).json({
-          error: 'Make.com API key not configured'
-        });
-      }
-
       const { scenarioId, action } = req.params;
 
       if (action !== 'start' && action !== 'stop') {

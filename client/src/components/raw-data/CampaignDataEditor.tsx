@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { collection, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, getDocs, query, where, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -23,7 +23,6 @@ interface CampaignEntry {
   pastDueAmount: number | null;
   previousNotes: string;
   log: string;
-  campaignId?: string;
 }
 
 interface Props {
@@ -33,10 +32,21 @@ interface Props {
 }
 
 export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
+  const [isLoading, setIsLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editedData, setEditedData] = useState<Partial<CampaignEntry>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // First, get all campaigns for this client
+  const fetchCampaignsForClient = async () => {
+    const campaignsRef = collection(db, "campaigns");
+    const q = query(campaignsRef, where("clientID", "==", clientId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  };
 
   const handleEdit = (entry: CampaignEntry) => {
     setEditingId(entry.id);
@@ -48,28 +58,36 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
 
     setIsLoading(true);
     try {
-      // Get the entry we're editing with its campaignId
-      const entry = data.find(e => e.id === editingId);
-      if (!entry?.campaignId) {
-        throw new Error("Could not find campaign ID for this entry");
+      // Get campaigns for this client
+      const campaigns = await fetchCampaignsForClient();
+      if (campaigns.length === 0) {
+        throw new Error("No campaigns found for this client");
       }
 
-      // Reference to the client's data document
-      const clientDataRef = doc(db, `campaigndata/${entry.campaignId}/clientdata`, clientId);
-      const docSnap = await getDoc(clientDataRef);
+      const campaignId = campaigns[0].id;
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
 
       // Get current entries
+      const docSnap = await getDoc(clientDataRef);
       const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
 
-      // Update the specific entry
-      const updatedEntries = currentEntries.map((e: CampaignEntry) =>
-        e.id === editingId ? { ...e, ...editedData } : e
+      // Update or add the edited entry
+      const updatedEntries = currentEntries.map((entry: CampaignEntry) =>
+        entry.id === editingId ? { ...entry, ...editedData } : entry
       );
+
+      // If entry wasn't found in the array, add it
+      if (!currentEntries.find((entry: CampaignEntry) => entry.id === editingId)) {
+        updatedEntries.push({ ...editedData, id: editingId });
+      }
 
       // Save back to Firestore
       await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
 
-      toast({ title: "Changes saved successfully" });
+      toast({
+        title: "Changes saved successfully"
+      });
+
       setEditingId(null);
       setEditedData({});
       onRefresh();
@@ -77,7 +95,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       console.error("Error saving changes:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save changes",
+        description: "Failed to save changes",
         variant: "destructive"
       });
     } finally {
@@ -85,54 +103,65 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
     }
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditedData({});
-  };
+  const handleDelete = async (entry: CampaignEntry) => {
+    if (!confirm("Are you sure you want to delete this entry?")) return;
 
-  const handleInputChange = (field: keyof CampaignEntry, value: string | number | null) => {
-    // For pastDueAmount, ensure it's a valid number or null
-    if (field === 'pastDueAmount') {
-      const num = value === '' || value === null ? null : Number(value);
-      if (num !== null && isNaN(num)) {
-        toast({
-          title: "Invalid input",
-          description: "Past due amount must be a number",
-          variant: "destructive"
-        });
-        return;
+    setIsLoading(true);
+    try {
+      const campaigns = await fetchCampaignsForClient();
+      if (campaigns.length === 0) {
+        throw new Error("No campaigns found for this client");
       }
-      setEditedData(prev => ({ ...prev, [field]: num }));
-      return;
-    }
 
-    // For all other fields, allow any string value including empty
-    setEditedData(prev => ({ ...prev, [field]: value }));
+      const campaignId = campaigns[0].id;
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+
+      // Get current entries
+      const docSnap = await getDoc(clientDataRef);
+      if (!docSnap.exists()) {
+        throw new Error("No entries found");
+      }
+
+      const currentEntries = docSnap.data().entries || [];
+      const updatedEntries = currentEntries.filter((e: CampaignEntry) => e.id !== entry.id);
+
+      // Update document with filtered entries
+      await setDoc(clientDataRef, { entries: updatedEntries }, { merge: true });
+
+      toast({
+        title: "Entry deleted successfully"
+      });
+
+      onRefresh();
+    } catch (error) {
+      console.error("Error deleting entry:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete entry",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAdd = async () => {
     setIsLoading(true);
     try {
-      // For new entries, use the campaign from existing entries
-      let campaignId;
-      if (data.length > 0 && data[0].campaignId) {
-        campaignId = data[0].campaignId;
-      } else {
-        throw new Error("No existing campaign found to add entry to");
+      const campaigns = await fetchCampaignsForClient();
+      if (campaigns.length === 0) {
+        throw new Error("No campaigns found for this client");
       }
 
-      console.log("Starting add operation", {
-        campaignId,
-        clientId
-      });
-
+      const campaignId = campaigns[0].id;
       const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+
+      // Get current entries and calculate next ID
       const docSnap = await getDoc(clientDataRef);
       const currentEntries = docSnap.exists() ? docSnap.data().entries || [] : [];
-
-      // Calculate next ID
-      const nextId = currentEntries.length > 0 ?
-        Math.max(...currentEntries.map((e: CampaignEntry) => e.id)) + 1 : 0;
+      const nextId = currentEntries.length > 0 
+        ? Math.max(...currentEntries.map((e: CampaignEntry) => e.id)) + 1 
+        : 0;
 
       const newEntry: CampaignEntry = {
         id: nextId,
@@ -149,13 +178,10 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
         companyPhone: "",
         pastDueAmount: null,
         previousNotes: "",
-        log: "",
-        campaignId
+        log: ""
       };
 
-      console.log("Adding new entry:", newEntry);
-
-      // Add new entry to existing entries array
+      // Add new entry to existing entries
       await setDoc(clientDataRef, {
         entries: [...currentEntries, newEntry]
       }, { merge: true });
@@ -169,7 +195,7 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
       console.error("Error adding new entry:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add new entry",
+        description: "Failed to add new entry",
         variant: "destructive"
       });
     } finally {
@@ -177,205 +203,184 @@ export function CampaignDataEditor({ clientId, data, onRefresh }: Props) {
     }
   };
 
+  const handleInputChange = (field: keyof CampaignEntry, value: string | number | null) => {
+    setEditedData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Contact Info</TableHead>
-            <TableHead>Company Info</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Notes</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((entry) => (
-            <TableRow key={entry.id}>
-              <TableCell>{entry.id}</TableCell>
-              <TableCell>
-                {editingId === entry.id ? (
-                  <Input
-                    value={editedData.status || ""}
-                    onChange={(e) => handleInputChange("status", e.target.value)}
-                  />
-                ) : (
-                  entry.status || "Not Set"
-                )}
-              </TableCell>
-              <TableCell>
-                {editingId === entry.id ? (
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="First Name"
-                      value={editedData.contactFirstName || ""}
-                      onChange={(e) => handleInputChange("contactFirstName", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Last Name"
-                      value={editedData.contactLastName || ""}
-                      onChange={(e) => handleInputChange("contactLastName", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Phone"
-                      value={editedData.contactPhone || ""}
-                      onChange={(e) => handleInputChange("contactPhone", e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <div>
-                      {entry.contactFirstName || entry.contactLastName ? 
-                        `${entry.contactFirstName || ""} ${entry.contactLastName || ""}`.trim() : 
-                        "Not Set"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {entry.contactPhone || "No Phone"}
-                    </div>
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                {editingId === entry.id ? (
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Company Name"
-                      value={editedData.companyName || ""}
-                      onChange={(e) => handleInputChange("companyName", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Address Line 1"
-                      value={editedData.companyAddress1 || ""}
-                      onChange={(e) => handleInputChange("companyAddress1", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Address Line 2"
-                      value={editedData.companyAddress2 || ""}
-                      onChange={(e) => handleInputChange("companyAddress2", e.target.value)}
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        placeholder="City"
-                        value={editedData.companyCity || ""}
-                        onChange={(e) => handleInputChange("companyCity", e.target.value)}
-                      />
-                      <Input
-                        placeholder="State"
-                        value={editedData.companyState || ""}
-                        onChange={(e) => handleInputChange("companyState", e.target.value)}
-                      />
-                      <Input
-                        placeholder="ZIP"
-                        value={editedData.companyZip || ""}
-                        onChange={(e) => handleInputChange("companyZip", e.target.value)}
-                      />
-                    </div>
-                    <Input
-                      placeholder="Phone"
-                      value={editedData.companyPhone || ""}
-                      onChange={(e) => handleInputChange("companyPhone", e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <div>{entry.companyName || "Not Set"}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {entry.companyAddress1 ? (
-                        <>
-                          {entry.companyAddress1}
-                          {entry.companyAddress2 && <>, {entry.companyAddress2}</>}
-                          <br />
-                          {entry.companyCity && entry.companyState && entry.companyZip && 
-                            `${entry.companyCity}, ${entry.companyState} ${entry.companyZip}`}
-                          <br />
-                          {entry.companyPhone || "No Phone"}
-                        </>
-                      ) : (
-                        "No Address"
-                      )}
-                    </div>
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                {editingId === entry.id ? (
-                  <Input
-                    type="number"
-                    value={editedData.pastDueAmount ?? ""}
-                    onChange={(e) => handleInputChange("pastDueAmount", e.target.value)}
-                    placeholder="Past Due Amount"
-                  />
-                ) : (
-                  entry.pastDueAmount != null ? `$${entry.pastDueAmount.toFixed(2)}` : "Not Set"
-                )}
-              </TableCell>
-              <TableCell>
-                {editingId === entry.id ? (
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Previous Notes"
-                      value={editedData.previousNotes || ""}
-                      onChange={(e) => handleInputChange("previousNotes", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Log"
-                      value={editedData.log || ""}
-                      onChange={(e) => handleInputChange("log", e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <div>{entry.previousNotes || "No Previous Notes"}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {entry.log || "No Log"}
-                    </div>
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="flex space-x-2">
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Campaign Entries for Client {clientId}</h3>
+        <Button onClick={handleAdd} disabled={isLoading}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Entry
+        </Button>
+      </div>
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Contact Info</TableHead>
+              <TableHead>Company Info</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((entry) => (
+              <TableRow key={entry.id}>
+                <TableCell>{entry.id}</TableCell>
+                <TableCell>
                   {editingId === entry.id ? (
-                    <>
-                      <Button
+                    <Input
+                      value={editedData.status || ""}
+                      onChange={(e) => handleInputChange("status", e.target.value)}
+                    />
+                  ) : (
+                    entry.status || "Not Set"
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === entry.id ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={editedData.contactFirstName || ""}
+                        onChange={(e) => handleInputChange("contactFirstName", e.target.value)}
+                        placeholder="First Name"
+                      />
+                      <Input
+                        value={editedData.contactLastName || ""}
+                        onChange={(e) => handleInputChange("contactLastName", e.target.value)}
+                        placeholder="Last Name"
+                      />
+                      <Input
+                        value={editedData.contactPhone || ""}
+                        onChange={(e) => handleInputChange("contactPhone", e.target.value)}
+                        placeholder="Phone"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <div>{entry.contactFirstName && entry.contactLastName ? 
+                        `${entry.contactFirstName} ${entry.contactLastName}`.trim() : 
+                        "Not Set"}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {entry.contactPhone || "No Phone"}
+                      </div>
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === entry.id ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={editedData.companyName || ""}
+                        onChange={(e) => handleInputChange("companyName", e.target.value)}
+                        placeholder="Company Name"
+                      />
+                      <Input
+                        value={editedData.companyAddress1 || ""}
+                        onChange={(e) => handleInputChange("companyAddress1", e.target.value)}
+                        placeholder="Address 1"
+                      />
+                      <Input
+                        value={editedData.companyAddress2 || ""}
+                        onChange={(e) => handleInputChange("companyAddress2", e.target.value)}
+                        placeholder="Address 2"
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input
+                          value={editedData.companyCity || ""}
+                          onChange={(e) => handleInputChange("companyCity", e.target.value)}
+                          placeholder="City"
+                        />
+                        <Input
+                          value={editedData.companyState || ""}
+                          onChange={(e) => handleInputChange("companyState", e.target.value)}
+                          placeholder="State"
+                        />
+                        <Input
+                          value={editedData.companyZip || ""}
+                          onChange={(e) => handleInputChange("companyZip", e.target.value)}
+                          placeholder="ZIP"
+                        />
+                      </div>
+                      <Input
+                        value={editedData.companyPhone || ""}
+                        onChange={(e) => handleInputChange("companyPhone", e.target.value)}
+                        placeholder="Phone"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <div>{entry.companyName || "Not Set"}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {entry.companyAddress1 ? (
+                          <>
+                            {entry.companyAddress1}
+                            {entry.companyAddress2 && <>, {entry.companyAddress2}</>}
+                            <br />
+                            {entry.companyCity}, {entry.companyState} {entry.companyZip}
+                            <br />
+                            {entry.companyPhone || "No Phone"}
+                          </>
+                        ) : (
+                          "No Address"
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === entry.id ? (
+                    <Input
+                      type="number"
+                      value={editedData.pastDueAmount ?? ""}
+                      onChange={(e) => handleInputChange("pastDueAmount", e.target.value ? parseFloat(e.target.value) : null)}
+                    />
+                  ) : (
+                    entry.pastDueAmount != null ? `$${entry.pastDueAmount.toFixed(2)}` : "Not Set"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    {editingId === entry.id ? (
+                      <Button 
                         onClick={handleSave}
                         disabled={isLoading}
                       >
                         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                       </Button>
+                    ) : (
                       <Button
                         variant="outline"
-                        onClick={handleCancel}
+                        onClick={() => handleEdit(entry)}
                         disabled={isLoading}
                       >
-                        Cancel
+                        Edit
                       </Button>
-                    </>
-                  ) : (
+                    )}
                     <Button
-                      variant="outline"
-                      onClick={() => handleEdit(entry)}
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDelete(entry)}
                       disabled={isLoading}
                     >
-                      Edit
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => handleDelete(entry)}
-                    disabled={isLoading}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

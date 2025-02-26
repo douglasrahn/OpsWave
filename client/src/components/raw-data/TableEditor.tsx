@@ -31,47 +31,27 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
       );
     }
 
-    // For each campaign associated with this client, get the client data
-    const fetchClientData = async () => {
-      try {
-        console.log("Looking up client:", clientId);
+    // Get all campaigns for this client and their associated data
+    const fetchClientCampaignData = async () => {
+      // First get all campaigns for this client
+      const campaignsRef = collection(db, "campaigns");
+      const q = query(campaignsRef, where("clientID", "==", clientId));
+      const campaignsSnapshot = await getDocs(q);
 
-        // Query campaigns for this client
-        const campaignsRef = collection(db, "campaigns");
-        const q = query(campaignsRef, where("clientId", "==", clientId));
-        const campaignSnapshot = await getDocs(q);
-
-        if (campaignSnapshot.empty) {
-          console.log("No campaigns found for client:", clientId);
-          return [];
-        }
-
-        const allEntries = [];
-        // For each campaign, get its client data
-        for (const campaignDoc of campaignSnapshot.docs) {
-          const campaignId = campaignDoc.id;
-          console.log("Processing campaign:", campaignId);
-
-          const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-          const clientDataSnap = await getDoc(clientDataRef);
-
-          if (clientDataSnap.exists()) {
-            const entries = clientDataSnap.data().entries || [];
-            // Add campaignId to each entry
-            const entriesWithCampaignId = entries.map((entry: any) => ({
-              ...entry,
-              campaignId
-            }));
-            allEntries.push(...entriesWithCampaignId);
-          }
-        }
-
-        console.log("Total entries found:", allEntries.length);
-        return allEntries;
-      } catch (error) {
-        console.error("Error fetching client data:", error);
-        throw error;
+      // Get the first campaign (for now)
+      if (campaignsSnapshot.empty) {
+        return [];
       }
+
+      const campaignId = campaignsSnapshot.docs[0].id;
+      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
+      const clientDataSnap = await getDoc(clientDataRef);
+
+      if (!clientDataSnap.exists()) {
+        return [];
+      }
+
+      return clientDataSnap.data().entries || [];
     };
 
     return (
@@ -88,7 +68,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleEdit = (row: Record<string, any>) => {
     setEditingRow(row.id);
-    setEditedData(row);
+    setEditedData({ ...row });
   };
 
   const handleCancel = () => {
@@ -111,7 +91,7 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
       setEditingRow(null);
       setEditedData(null);
-      onRefresh();
+      onRefresh(); // Refresh the data
     } catch (error) {
       console.error("Error updating document:", error);
       toast({
