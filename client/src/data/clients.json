@@ -11,6 +11,18 @@
           "uid": "test123"
         }
       ]
+    },
+    {
+      "clientId": "0",
+      "companyName": "Blue Island",
+      "url": "https://blueisland.ai",
+      "users": [
+        {
+          "email": "drahn@blueisland.ai",
+          "role": "admin",
+          "uid": "test123"
+        }
+      ]
     }
   ]
 }

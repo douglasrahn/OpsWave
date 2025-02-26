@@ -8,7 +8,7 @@ import { z } from 'zod';
 const MAKE_API_KEY = process.env.REPLIT_MAKE_API_KEY || process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
 const MAKE_ORG_ID = process.env.REPLIT_MAKE_ORG_ID || process.env.MAKE_ORG_ID || '493039';
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
+const DATA_DIR = path.join(process.cwd(), 'client', 'src', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
 
 // Validate required environment variables
@@ -38,7 +38,7 @@ export function registerRoutes(app: Express) {
       const { uid } = req.params;
       const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
       const data = JSON.parse(rawData);
-      
+
       const client = data.clients.find((c: Client) => 
         c.users.some(user => user.uid === uid)
       );
