@@ -2,8 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { UserTable } from "@/components/users/UserTable";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import clientsData from "@/data/clients.json";
 
 interface User {
   id: string;
@@ -16,11 +15,15 @@ export default function UsersPage() {
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["users"],
     queryFn: async () => {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as Omit<User, 'id'>
-      }));
+      // Transform client user data to match the interface
+      return clientsData.clients.flatMap(client => 
+        client.users.map(user => ({
+          id: user.uid,
+          email: user.email,
+          accessLevel: user.role,
+          clientId: client.clientId
+        }))
+      );
     }
   });
 

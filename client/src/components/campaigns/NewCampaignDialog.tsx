@@ -12,8 +12,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -36,21 +34,12 @@ export function NewCampaignDialog() {
 
   const onSubmit = async (data: CampaignFormData) => {
     try {
-      // Create new campaign document with minimal data
-      const docRef = await addDoc(collection(db, "campaigns"), {
-        ...data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      console.log("Created new campaign with ID:", docRef.id);
-
+      // For now, we'll just show a message since we're using local storage
       toast({
-        title: "Campaign created successfully",
-        description: "You can now add details through CSV upload or raw data editor"
+        title: "Note",
+        description: "Campaign creation will be implemented in the next phase when we add campaigns.json"
       });
 
-      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       form.reset();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to create campaign";

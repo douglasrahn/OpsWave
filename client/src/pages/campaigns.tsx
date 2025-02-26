@@ -1,12 +1,10 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { NewCampaignDialog } from "@/components/campaigns/NewCampaignDialog";
 import { CampaignTable } from "@/components/campaigns/CampaignTable";
 import { Loader2 } from "lucide-react";
 
-interface FirebaseCampaign {
+interface Campaign {
   id: string;
   campaignName: string;
   companyName?: string;
@@ -18,18 +16,11 @@ interface FirebaseCampaign {
 }
 
 export default function CampaignsPage() {
-  const { data: campaigns, isLoading, error } = useQuery<FirebaseCampaign[]>({
+  const { data: campaigns, isLoading, error } = useQuery<Campaign[]>({
     queryKey: ["campaigns"],
     queryFn: async () => {
-      const campaignsQuery = query(
-        collection(db, "campaigns"),
-        orderBy("createdAt", "desc")
-      );
-      const querySnapshot = await getDocs(campaignsQuery);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as FirebaseCampaign[];
+      // For now, return an empty array since we haven't implemented campaigns.json yet
+      return [];
     }
   });
 

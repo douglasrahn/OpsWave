@@ -1,9 +1,8 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubscriptionTable } from "@/components/subscriptions/SubscriptionTable";
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import clientsData from "@/data/clients.json";
 
 interface Client {
   id: string;
@@ -20,21 +19,24 @@ export default function SubscriptionsPage() {
   const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: ["clients"],
     queryFn: async () => {
-      const querySnapshot = await getDocs(collection(db, "clients"));
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as Omit<Client, 'id'>
+      // Transform local data to match the interface
+      return clientsData.clients.map(client => ({
+        id: client.clientId,
+        companyName: client.companyName,
+        url: client.url,
+        collections: false,
+        salesQualifier: false,
+        survey: false
       }));
     }
   });
 
   const handleToggleSubscription = async (clientId: string, service: string, value: boolean) => {
     try {
-      await updateDoc(doc(db, "clients", clientId), {
-        [service]: value
-      });
+      // For now, just show a toast since we're using local storage
       toast({
-        title: "Subscription updated successfully"
+        title: "Note",
+        description: "Subscription updates will be implemented in the next phase"
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
