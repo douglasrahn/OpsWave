@@ -20,15 +20,21 @@ export function registerRoutes(app: Express) {
       });
 
       if (!response.ok) {
+        console.error("[Make.com API] Request failed:", response.status, response.statusText);
         const errorText = await response.text();
-        console.error('Make.com API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText
-        });
+        console.error("[Make.com API] Error response:", errorText);
         return res.status(response.status).json({
-          error: 'Failed to fetch scenario status',
+          error: `API request failed with status ${response.status}: ${response.statusText}`,
           details: errorText
+        });
+      }
+
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error("[Make.com API] Received non-JSON response:", contentType);
+        return res.status(500).json({
+          error: "Invalid API response format - expected JSON"
         });
       }
 
@@ -37,7 +43,8 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('API Request failed:', error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Internal server error'
+        error: error instanceof Error ? error.message : 'Internal server error',
+        details: 'A network error occurred while communicating with Make.com API'
       });
     }
   });
@@ -64,15 +71,21 @@ export function registerRoutes(app: Express) {
       });
 
       if (!response.ok) {
+        console.error("[Make.com API] Request failed:", response.status, response.statusText);
         const errorText = await response.text();
-        console.error('Make.com API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText
-        });
+        console.error("[Make.com API] Error response:", errorText);
         return res.status(response.status).json({
-          error: `Failed to ${action} scenario`,
+          error: `Failed to ${action} scenario: ${response.statusText}`,
           details: errorText
+        });
+      }
+
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error("[Make.com API] Received non-JSON response:", contentType);
+        return res.status(500).json({
+          error: "Invalid API response format - expected JSON"
         });
       }
 
@@ -81,7 +94,8 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('API Request failed:', error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Internal server error'
+        error: error instanceof Error ? error.message : 'Internal server error',
+        details: 'A network error occurred while communicating with Make.com API'
       });
     }
   });

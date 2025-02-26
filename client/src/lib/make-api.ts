@@ -46,21 +46,26 @@ async function makeRequest(
       },
     });
 
+    if (!response.ok) {
+      console.error("[Make.com API] Request failed:", response.status, response.statusText);
+      const errorText = await response.text();
+      console.error("[Make.com API] Error response:", errorText);
+      throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+    }
+
     // Check if we got a JSON response
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
       console.error("[Make.com API] Received non-JSON response:", contentType);
-      console.error("[Make.com API] Response text:", await response.text());
       throw new Error("Invalid API response format - expected JSON");
     }
 
     const data = await response.json();
     console.log("[Make.com API] Response data:", data);
 
-    if (!response.ok) {
-      const errorMessage = data.error || `API request failed with status ${response.status}`;
-      console.error("[Make.com API] Error response:", data);
-      throw new Error(errorMessage);
+    if (data.error) {
+      console.error("[Make.com API] Error in response:", data.error);
+      throw new Error(data.error);
     }
 
     return data;
