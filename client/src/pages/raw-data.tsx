@@ -3,24 +3,11 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Database, FileSpreadsheet, Users, Settings, Phone } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { Database, FileSpreadsheet, Users, Settings, Loader2 } from "lucide-react";
+import clientsData from "@/data/clients.json";
 
-// List of available Firebase tables with improved metadata
+// List of available tables with improved metadata
 const TABLES = [
-  { 
-    id: "campaigndata", 
-    name: "Campaign Entries", 
-    icon: Database,
-    description: "Detailed campaign contact and company information by client"
-  },
-  { 
-    id: "campaigns", 
-    name: "Campaigns", 
-    icon: FileSpreadsheet,
-    description: "Campaign data including contacts and status"
-  },
   { 
     id: "clients", 
     name: "Clients", 
@@ -28,10 +15,10 @@ const TABLES = [
     description: "Client organization information"
   },
   { 
-    id: "scenarios", 
-    name: "Scenarios", 
-    icon: Settings,
-    description: "Automation scenario configurations"
+    id: "campaigns", 
+    name: "Campaigns", 
+    icon: FileSpreadsheet,
+    description: "Campaign data and configurations"
   }
 ];
 
@@ -41,21 +28,35 @@ export default function RawDataPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const fetchTableData = async (tableName: string) => {
+  const loadTableData = (tableName: string) => {
     setIsLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, tableName));
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      let data: any[] = [];
+
+      // Load data from local JSON based on table name
+      switch (tableName) {
+        case "clients":
+          data = clientsData.clients.map(client => ({
+            id: client.clientId,
+            ...client
+          }));
+          break;
+        case "campaigns":
+          // We'll implement this when we add campaigns.json
+          data = [];
+          break;
+        default:
+          console.error("Unknown table:", tableName);
+          return;
+      }
+
       setTableData(data);
       setSelectedTable(tableName);
     } catch (error) {
-      console.error("Error fetching table data:", error);
+      console.error("Error loading table data:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch table data",
+        description: "Failed to load table data",
         variant: "destructive"
       });
     } finally {
@@ -63,18 +64,12 @@ export default function RawDataPage() {
     }
   };
 
-  const handleRefresh = () => {
-    if (selectedTable) {
-      fetchTableData(selectedTable);
-    }
-  };
-
   return (
     <DashboardLayout>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Raw Data Editor</h1>
+        <h1 className="text-3xl font-bold">Data Editor</h1>
         <p className="text-muted-foreground mt-2">
-          Administrative interface for managing database tables
+          Administrative interface for managing data
         </p>
       </div>
 
@@ -84,7 +79,7 @@ export default function RawDataPage() {
             <Card
               key={table.id}
               className="cursor-pointer hover:bg-accent/50 transition-colors"
-              onClick={() => fetchTableData(table.id)}
+              onClick={() => loadTableData(table.id)}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -124,7 +119,7 @@ export default function RawDataPage() {
             <TableEditor
               tableName={selectedTable}
               data={tableData}
-              onRefresh={handleRefresh}
+              onRefresh={() => loadTableData(selectedTable)}
             />
           )}
         </div>

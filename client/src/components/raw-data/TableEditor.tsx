@@ -4,10 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc, getDocs, collection, query, where, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { CampaignDataEditor } from "./CampaignDataEditor";
-import { getCurrentClientId } from "@/lib/auth";
+import { getSessionInfo } from "@/lib/localStorage";
 
 interface TableEditorProps {
   tableName: string;
@@ -19,49 +16,6 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editedData, setEditedData] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
-
-  // Special handling for campaigndata table
-  if (tableName === 'campaigndata') {
-    const clientId = getCurrentClientId();
-    if (!clientId) {
-      return (
-        <div className="text-center py-8 text-destructive">
-          Error: No client ID found. Please ensure you are logged in.
-        </div>
-      );
-    }
-
-    // Get all campaigns for this client and their associated data
-    const fetchClientCampaignData = async () => {
-      // First get all campaigns for this client
-      const campaignsRef = collection(db, "campaigns");
-      const q = query(campaignsRef, where("clientID", "==", clientId));
-      const campaignsSnapshot = await getDocs(q);
-
-      // Get the first campaign (for now)
-      if (campaignsSnapshot.empty) {
-        return [];
-      }
-
-      const campaignId = campaignsSnapshot.docs[0].id;
-      const clientDataRef = doc(db, `campaigndata/${campaignId}/clientdata`, clientId);
-      const clientDataSnap = await getDoc(clientDataRef);
-
-      if (!clientDataSnap.exists()) {
-        return [];
-      }
-
-      return clientDataSnap.data().entries || [];
-    };
-
-    return (
-      <CampaignDataEditor
-        clientId={clientId}
-        data={data}
-        onRefresh={onRefresh}
-      />
-    );
-  }
 
   // Handle regular tables
   const headers = data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'id') : [];
@@ -78,15 +32,10 @@ export function TableEditor({ tableName, data, onRefresh }: TableEditorProps) {
 
   const handleSave = async (id: string) => {
     try {
-      const docRef = doc(db, tableName, id);
-      const updateData = { ...editedData };
-      delete updateData.id; // Remove id from update data
-
-      await updateDoc(docRef, updateData);
-
+      // For now, we'll just show a message since we're not persisting changes
       toast({
-        title: "Success",
-        description: "Record updated successfully"
+        title: "Note",
+        description: "Changes will be implemented in the next phase",
       });
 
       setEditingRow(null);

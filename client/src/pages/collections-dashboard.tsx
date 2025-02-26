@@ -2,15 +2,14 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { PhoneCall, Clock, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
 import { toggleScenario, getScenarioStatus, type ScenarioResponse } from "@/lib/make-api";
 import { getCurrentClientId } from "@/lib/auth";
 import { useLocation } from "wouter";
+import clientsData from "@/data/clients.json";
 
 // Only store configuration, no status
 interface ScenarioSettings {
@@ -47,34 +46,22 @@ export default function CollectionsDashboardPage() {
           throw new Error("Please log in again");
         }
 
-        // Only fetch configuration from Firebase
-        const scenarioQuery = query(
-          collection(db, "scenarios"),
-          where("clientId", "==", clientId),
-          where("serviceId", "==", "CollectionReminders")
-        );
-
-        console.log("[Dashboard] Executing Firestore query...");
-        const scenarioSnapshot = await getDocs(scenarioQuery);
-        console.log("[Dashboard] Query result:", scenarioSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
-        if (scenarioSnapshot.empty) {
-          console.error("[Dashboard] No scenario found for client:", clientId);
-          throw new Error("No scenario found for this client");
+        // Find client in local JSON data
+        const client = clientsData.clients.find(c => c.clientId === clientId);
+        if (!client) {
+          console.error("[Dashboard] Client not found in local data:", clientId);
+          throw new Error("Client not found");
         }
 
+        // For now, we'll use a hardcoded scenario ID
+        // In production, this would come from a configuration file or API
         const settings = {
           clientId,
           serviceId: "CollectionReminders",
-          scenarioId: scenarioSnapshot.docs[0].data().scenarioId
+          scenarioId: "3684649" // This is the scenario ID from Make.com
         } as ScenarioSettings;
 
-        console.log("[Dashboard] Fetched scenario config:", settings);
-
-        if (!settings.scenarioId) {
-          console.error("[Dashboard] Missing scenario ID in config:", settings);
-          throw new Error("Invalid scenario configuration");
-        }
+        console.log("[Dashboard] Using scenario config:", settings);
 
         try {
           console.log("[Dashboard] Fetching Make.com status...");
@@ -175,18 +162,6 @@ export default function CollectionsDashboardPage() {
       setIsLoading(false);
     }
   };
-
-  // Display error toast if query fails
-  useEffect(() => {
-    if (isError) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load scenario settings";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  }, [isError, error, toast]);
 
   if (isError) {
     return (
