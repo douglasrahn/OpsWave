@@ -9,17 +9,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Verify that all required configuration values are present
-const requiredConfigs = ['apiKey', 'authDomain', 'projectId', 'appId'];
-for (const config of requiredConfigs) {
-  if (!firebaseConfig[config as keyof typeof firebaseConfig]) {
-    console.error(`Missing required Firebase configuration: ${config}`);
-    throw new Error(`Missing required Firebase configuration: ${config}`);
-  }
-}
-
-console.log("Initializing Firebase with project:", firebaseConfig.projectId);
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -29,10 +18,10 @@ export const auth = getAuth(app);
 // Initialize the auth state
 export async function initializeAuth() {
   try {
-    console.log("Starting Firebase initialization...");
-    console.log("Firebase initialized successfully");
+    console.log("Starting Firebase authentication initialization...");
+    console.log("Firebase authentication initialized successfully");
   } catch (error) {
-    console.error("Error initializing Firebase:", error);
+    console.error("Error initializing Firebase authentication:", error);
     throw error;
   }
 }

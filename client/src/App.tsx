@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { useEffect, useState } from "react";
-import { initializeDatabase } from "./lib/firebase";
+import { initializeAuth } from "./lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
@@ -38,7 +38,7 @@ function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        await initializeDatabase();
+        await initializeAuth();
         console.log("Firebase initialized successfully");
         setIsInitializing(false);
       } catch (error: any) {
