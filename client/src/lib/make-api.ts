@@ -40,17 +40,20 @@ async function makeRequest(
       },
     });
 
-    // Check if we got a JSON response
     const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      console.error("[Make.com API] Received non-JSON response:", contentType);
-      const responseText = await response.text();
-      console.error("[Make.com API] Response text:", responseText);
-      throw new Error("Invalid API response format - expected JSON");
-    }
+    console.log('[Make.com API] Response content type:', contentType);
 
-    const data = await response.json();
-    console.log("[Make.com API] Response data:", data);
+    const responseText = await response.text();
+    console.log('[Make.com API] Raw response:', responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log('[Make.com API] Parsed response:', data);
+    } catch (error) {
+      console.error('[Make.com API] Failed to parse response as JSON:', error);
+      throw new Error('Invalid API response format');
+    }
 
     if (!response.ok) {
       const errorMessage = data.error || `API request failed with status ${response.status}`;

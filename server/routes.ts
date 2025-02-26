@@ -2,7 +2,7 @@ import type { Express } from "express";
 import fetch from 'node-fetch';
 
 const MAKE_API_KEY = process.env.MAKE_API_KEY;
-const MAKE_API_BASE_URL = 'https://eu1.make.com/api/v2';  // Updated to eu1 endpoint
+const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';  // Reverted back to us1 endpoint
 
 export function registerRoutes(app: Express) {
   // Get scenario status
@@ -16,19 +16,40 @@ export function registerRoutes(app: Express) {
       }
 
       const { scenarioId } = req.params;
-      console.log(`Fetching scenario status for ID: ${scenarioId}`);
+      const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}`;
+      console.log(`[Make.com] Fetching scenario status, URL: ${url}`);
 
-      const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}`, {
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Token ${MAKE_API_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
+      // Check response content type
+      const contentType = response.headers.get('content-type');
+      console.log('[Make.com] Response content type:', contentType);
+
+      const responseText = await response.text();
+      console.log('[Make.com] Raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('[Make.com] Parsed response:', data);
+      } catch (parseError) {
+        console.error('[Make.com] Failed to parse response as JSON:', parseError);
+        return res.status(500).json({
+          error: 'Invalid API response format'
+        });
+      }
+
       if (!response.ok) {
-        console.error('Make.com API error:', {
+        console.error('[Make.com] API error:', {
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
+          data
         });
 
         return res.status(response.status).json({
@@ -36,11 +57,9 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const data = await response.json();
-      console.log('Make.com API response:', data);
       res.json(data);
     } catch (error) {
-      console.error('API Request failed:', error);
+      console.error('[Make.com] API Request failed:', error);
       res.status(500).json({
         error: error instanceof Error ? error.message : 'Internal server error'
       });
@@ -58,7 +77,8 @@ export function registerRoutes(app: Express) {
       }
 
       const { scenarioId, action } = req.params;
-      console.log(`Toggling scenario ${scenarioId} with action: ${action}`);
+      const url = `${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`;
+      console.log(`[Make.com] Toggling scenario, URL: ${url}`);
 
       if (action !== 'start' && action !== 'stop') {
         return res.status(400).json({
@@ -66,18 +86,37 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const response = await fetch(`${MAKE_API_BASE_URL}/scenarios/${scenarioId}/${action}`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${MAKE_API_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
+      const contentType = response.headers.get('content-type');
+      console.log('[Make.com] Response content type:', contentType);
+
+      const responseText = await response.text();
+      console.log('[Make.com] Raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('[Make.com] Parsed response:', data);
+      } catch (parseError) {
+        console.error('[Make.com] Failed to parse response as JSON:', parseError);
+        return res.status(500).json({
+          error: 'Invalid API response format'
+        });
+      }
+
       if (!response.ok) {
-        console.error('Make.com API error:', {
+        console.error('[Make.com] API error:', {
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
+          data
         });
 
         return res.status(response.status).json({
@@ -85,11 +124,9 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const data = await response.json();
-      console.log('Make.com API response:', data);
       res.json(data);
     } catch (error) {
-      console.error('API Request failed:', error);
+      console.error('[Make.com] API Request failed:', error);
       res.status(500).json({
         error: error instanceof Error ? error.message : 'Internal server error'
       });

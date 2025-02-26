@@ -2,11 +2,11 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { PhoneCall, Clock, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useQuery } from "@tanstack/react-query";
 import { toggleScenario, getScenarioStatus, type ScenarioResponse } from "@/lib/make-api";
 import { getCurrentClientId } from "@/lib/auth";
@@ -36,69 +36,48 @@ export default function CollectionsDashboardPage() {
     queryKey: ["scenarioSettings"],
     queryFn: async () => {
       try {
-        console.log("[Dashboard] Fetching scenario settings...");
+        console.log("[Dashboard] Starting scenario status check...");
 
         const clientId = getCurrentClientId();
-        console.log("[Dashboard] Client ID:", clientId);
-
         if (!clientId) {
           console.error("[Dashboard] No client ID found in session");
           setLocation("/login");
           throw new Error("Please log in again");
         }
 
-        // Only fetch configuration from Firebase
+        // Get the scenario configuration
         const scenarioQuery = query(
           collection(db, "scenarios"),
           where("clientId", "==", clientId),
           where("serviceId", "==", "CollectionReminders")
         );
 
-        console.log("[Dashboard] Executing Firestore query...");
         const scenarioSnapshot = await getDocs(scenarioQuery);
-        console.log("[Dashboard] Query result:", scenarioSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
         if (scenarioSnapshot.empty) {
           console.error("[Dashboard] No scenario found for client:", clientId);
           throw new Error("No scenario found for this client");
         }
 
+        // Get scenario ID and validate it
         const settings = {
           clientId,
           serviceId: "CollectionReminders",
           scenarioId: scenarioSnapshot.docs[0].data().scenarioId
         } as ScenarioSettings;
 
-        console.log("[Dashboard] Fetched scenario config:", settings);
+        console.log("[Dashboard] Scenario settings:", settings);
 
-        if (!settings.scenarioId) {
-          console.error("[Dashboard] Missing scenario ID in config:", settings);
-          throw new Error("Invalid scenario configuration");
+        if (!settings.scenarioId || !isValidScenarioId(settings.scenarioId)) {
+          console.error("[Dashboard] Invalid scenario ID:", settings.scenarioId);
+          throw new Error("Invalid scenario ID format");
         }
 
-        try {
-          console.log("[Dashboard] Fetching Make.com status...");
-          const status = await getScenarioStatus(settings.scenarioId);
-          console.log("[Dashboard] Make.com API status:", status);
-          return { settings, status };
-        } catch (apiError) {
-          console.error("[Dashboard] Make.com API error:", apiError);
-          // Return a default status if the Make.com API is unavailable
-          return {
-            settings,
-            status: {
-              scenario: {
-                id: parseInt(settings.scenarioId),
-                name: "Collection Reminders",
-                isActive: false,
-                teamId: 0,
-                description: "Automatic collection reminder calls",
-                lastEdit: new Date().toISOString(),
-                created: new Date().toISOString(),
-              }
-            }
-          };
-        }
+        // Get the actual status from Make.com
+        console.log("[Dashboard] Fetching Make.com status for scenario:", settings.scenarioId);
+        const status = await getScenarioStatus(settings.scenarioId);
+        console.log("[Dashboard] Make.com status response:", status);
+
+        return { settings, status };
       } catch (error) {
         console.error("[Dashboard] Error in queryFn:", error);
         throw error;
@@ -110,12 +89,14 @@ export default function CollectionsDashboardPage() {
   const handleRefreshStatus = async () => {
     setIsRefreshing(true);
     try {
+      console.log("[Dashboard] Manually refreshing scenario status...");
       await refetch();
       toast({
         title: "Status Updated",
         description: "Scenario status has been refreshed"
       });
     } catch (error) {
+      console.error("[Dashboard] Error refreshing status:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to refresh status";
       toast({
         title: "Error",
@@ -176,18 +157,6 @@ export default function CollectionsDashboardPage() {
     }
   };
 
-  // Display error toast if query fails
-  useEffect(() => {
-    if (isError) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load scenario settings";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  }, [isError, error, toast]);
-
   if (isError) {
     return (
       <DashboardLayout>
@@ -206,6 +175,15 @@ export default function CollectionsDashboardPage() {
         </div>
       </DashboardLayout>
     );
+  }
+
+  // Add debug log to check scenario status
+  if (scenarioData?.status) {
+    console.log("[Dashboard] Current scenario status:", {
+      isActive: scenarioData.status.scenario.isActive,
+      scenarioId: scenarioData.settings.scenarioId,
+      rawStatus: scenarioData.status
+    });
   }
 
   return (
@@ -310,11 +288,6 @@ export default function CollectionsDashboardPage() {
               Toggle this switch to pause or resume the AI calling agent.
               When paused, no new calls will be initiated.
             </p>
-            {scenarioData?.status.scenario.nextExec && (
-              <p className="text-sm text-muted-foreground">
-                Next execution: {new Date(scenarioData.status.scenario.nextExec).toLocaleString()}
-              </p>
-            )}
           </div>
         </CardContent>
       </Card>
