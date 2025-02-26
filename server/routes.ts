@@ -1,12 +1,20 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import fetch from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
 import { z } from 'zod';
 
-const MAKE_API_KEY = process.env.MAKE_API_KEY;
+// Prioritize Replit secrets over local .env
+const MAKE_API_KEY = process.env.REPLIT_MAKE_API_KEY || process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
-const MAKE_ORG_ID = '493039';
+const MAKE_ORG_ID = process.env.REPLIT_MAKE_ORG_ID || process.env.MAKE_ORG_ID || '493039';
+const DATA_DIR = path.join(process.cwd(), 'server', 'data');
+const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
+
+// Validate required environment variables
+if (!MAKE_API_KEY) {
+  console.warn('Warning: MAKE_API_KEY not set. Make.com API calls will fail.');
+}
 
 // Client data validation schema
 const clientSchema = z.object({
@@ -20,9 +28,34 @@ const clientSchema = z.object({
   }))
 });
 
+// Type for client data
+type Client = z.infer<typeof clientSchema>;
+
 export function registerRoutes(app: Express) {
+  // Get client by UID
+  app.get('/api/clients/user/:uid', async (req: Request, res: Response) => {
+    try {
+      const { uid } = req.params;
+      const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+      const data = JSON.parse(rawData);
+      
+      const client = data.clients.find((c: Client) => 
+        c.users.some(user => user.uid === uid)
+      );
+
+      if (!client) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      return res.json(client);
+    } catch (error) {
+      console.error('Error fetching client by UID:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Client data update endpoint
-  app.patch('/api/clients/:id', async (req, res) => {
+  app.patch('/api/clients/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const updateData = req.body;
@@ -40,12 +73,11 @@ export function registerRoutes(app: Express) {
       }
 
       // Read current data
-      const dataPath = path.join(process.cwd(), 'client', 'src', 'data', 'clients.json');
-      const rawData = await fs.readFile(dataPath, 'utf-8');
+      const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
       const data = JSON.parse(rawData);
 
       // Find and update the client
-      const clientIndex = data.clients.findIndex((c: any) => c.clientId === id);
+      const clientIndex = data.clients.findIndex((c: Client) => c.clientId === id);
       if (clientIndex === -1) {
         return res.status(404).json({ error: 'Client not found' });
       }
@@ -57,15 +89,12 @@ export function registerRoutes(app: Express) {
       };
 
       // Write back to file
-      await fs.writeFile(dataPath, JSON.stringify(data, null, 2));
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2));
 
-      res.json(data.clients[clientIndex]);
+      return res.json(data.clients[clientIndex]);
     } catch (error) {
       console.error('Error updating client:', error);
-      res.status(500).json({
-        error: 'Failed to update client data',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
