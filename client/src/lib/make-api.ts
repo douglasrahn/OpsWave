@@ -11,10 +11,6 @@ const scenarioResponseSchema = z.object({
     lastEdit: z.string(),
     nextExec: z.string().optional(),
     created: z.string(),
-    scheduling: z.object({
-      type: z.string(),
-      interval: z.number().optional(),
-    }).optional(),
   }),
 });
 
@@ -30,10 +26,8 @@ async function makeRequest(
   try {
     const method = options.method || "GET";
     console.log(`[Make.com API] Making ${method} request:`, {
-      url: endpoint,
-      fullUrl: `${window.location.origin}${endpoint}`,
+      endpoint,
       method,
-      headers: options.headers,
       options,
     });
 
@@ -50,7 +44,8 @@ async function makeRequest(
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
       console.error("[Make.com API] Received non-JSON response:", contentType);
-      console.error("[Make.com API] Response text:", await response.text());
+      const responseText = await response.text();
+      console.error("[Make.com API] Response text:", responseText);
       throw new Error("Invalid API response format - expected JSON");
     }
 
@@ -66,9 +61,6 @@ async function makeRequest(
     return data;
   } catch (error) {
     console.error("[Make.com API] Request failed:", error);
-    if (error instanceof Error && error.message.includes("API response format")) {
-      throw new Error("Unable to connect to Make.com API. Please check your configuration.");
-    }
     throw error instanceof Error
       ? error
       : new Error("Failed to communicate with Make.com API");
@@ -101,46 +93,6 @@ export async function getScenarioStatus(
 }
 
 /**
- * Start a scenario if it's not already running
- */
-export async function startScenario(
-  scenarioId: string,
-): Promise<ScenarioResponse> {
-  try {
-    const status = await getScenarioStatus(scenarioId);
-    if (status.scenario.isActive) {
-      console.log("[Make.com API] Scenario is already active, skipping start request");
-      return status;
-    }
-    await makeRequest(`/api/scenarios/${scenarioId}/start`, { method: "POST" });
-    return await getScenarioStatus(scenarioId); // Get fresh status after action
-  } catch (error) {
-    console.error("[Make.com API] startScenario failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Stop a scenario if it's currently running
- */
-export async function stopScenario(
-  scenarioId: string,
-): Promise<ScenarioResponse> {
-  try {
-    const status = await getScenarioStatus(scenarioId);
-    if (!status.scenario.isActive) {
-      console.log("[Make.com API] Scenario is not active, skipping stop request");
-      return status;
-    }
-    await makeRequest(`/api/scenarios/${scenarioId}/stop`, { method: "POST" });
-    return await getScenarioStatus(scenarioId); // Get fresh status after action
-  } catch (error) {
-    console.error("[Make.com API] stopScenario failed:", error);
-    throw error;
-  }
-}
-
-/**
  * Toggle a scenario's state
  */
 export async function toggleScenario(
@@ -149,12 +101,21 @@ export async function toggleScenario(
 ): Promise<ScenarioResponse> {
   console.log(`[Make.com API] Toggling scenario ${scenarioId} to ${activate ? "active" : "inactive"}`);
   try {
-    const response = activate
-      ? await startScenario(scenarioId)
-      : await stopScenario(scenarioId);
+    // Make direct request to toggle endpoint
+    const action = activate ? "start" : "stop";
+    const response = await makeRequest(`/api/scenarios/${scenarioId}/${action}`, { 
+      method: "POST" 
+    });
 
-    console.log(`[Make.com API] Successfully ${activate ? "started" : "stopped"} scenario:`, response);
-    return response;
+    // Validate response format
+    const validatedData = scenarioResponseSchema.safeParse(response);
+    if (!validatedData.success) {
+      console.error("[Make.com API] Schema validation failed:", validatedData.error);
+      throw new Error("Invalid API response format");
+    }
+
+    console.log(`[Make.com API] Successfully ${action}ed scenario:`, validatedData.data);
+    return validatedData.data;
   } catch (error) {
     console.error(`[Make.com API] Failed to ${activate ? "start" : "stop"} scenario:`, error);
     throw error;
