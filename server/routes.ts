@@ -29,15 +29,6 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      // Check content type before parsing
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error("[Make.com API] Received non-JSON response:", contentType);
-        return res.status(500).json({
-          error: "Invalid API response format - expected JSON"
-        });
-      }
-
       const data = await response.json();
       res.json(data);
     } catch (error) {
@@ -77,15 +68,6 @@ export function registerRoutes(app: Express) {
         return res.status(response.status).json({
           error: `Failed to ${action} scenario: ${response.statusText}`,
           details: errorText
-        });
-      }
-
-      // Check content type before parsing
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error("[Make.com API] Received non-JSON response:", contentType);
-        return res.status(500).json({
-          error: "Invalid API response format - expected JSON"
         });
       }
 
