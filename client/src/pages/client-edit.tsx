@@ -16,7 +16,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+// Import the JSON file directly
+import clientsData from "../../../server/data/clients.json";
 
 const clientSchema = z.object({
   clientId: z.string().min(1, "Client ID is required"),
@@ -31,7 +33,6 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [isNewClient, setIsNewClient] = useState(false);
-  const queryClient = useQueryClient();
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
@@ -42,29 +43,19 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
     },
   });
 
-  const { data: clientData } = useQuery({
-    queryKey: ['/api/clients', params.id],
-    queryFn: async () => {
-      const response = await fetch(`/api/clients/${params.id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          setIsNewClient(true);
-          return null;
-        }
-        throw new Error(`Failed to fetch client: ${response.status}`);
-      }
-      return response.json();
-    }
-  });
-
   useEffect(() => {
-    if (clientData) {
+    // Find the client in our JSON data
+    const client = clientsData.clients.find(c => c.clientId === params.id);
+
+    if (client) {
+      // Existing client - populate form
       form.reset({
-        clientId: clientData.clientId,
-        companyName: clientData.companyName,
-        url: clientData.url,
+        clientId: client.clientId,
+        companyName: client.companyName,
+        url: client.url,
       });
     } else {
+      // New client
       setIsNewClient(true);
       form.reset({
         clientId: params.id,
@@ -72,7 +63,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         url: "",
       });
     }
-  }, [clientData, params.id, form]);
+  }, [params.id, form]);
 
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
@@ -95,9 +86,6 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         const errorData = await response.json();
         throw new Error(errorData.error || (isNewClient ? "Failed to create client" : "Failed to update client"));
       }
-
-      // Invalidate relevant queries to refresh the data
-      await queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
 
       toast({
         title: "Success",
