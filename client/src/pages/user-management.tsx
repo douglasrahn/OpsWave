@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+// Import the JSON file directly
+import clientsData from "../../../server/data/clients.json";
 
 interface SearchResults {
   clients: Array<{
@@ -30,27 +33,6 @@ interface SearchResults {
 export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(true);
-  const [clientsData, setClientsData] = useState<any>(null);
-
-  // Load clients data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/clients');
-        if (!response.ok) {
-          throw new Error('Failed to fetch clients');
-        }
-        const data = await response.json();
-        setClientsData(data);
-      } catch (error) {
-        console.error('Error loading clients data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   // Filter data based on search term
   const searchResults: SearchResults = {
@@ -58,22 +40,22 @@ export default function UserManagementPage() {
     users: []
   };
 
-  if (clientsData?.clients && searchTerm.trim()) {
+  if (searchTerm.trim()) {
     const term = searchTerm.toLowerCase();
 
     // Search clients
-    searchResults.clients = clientsData.clients.filter((client: any) => 
+    searchResults.clients = clientsData.clients.filter(client => 
       client.clientId.toLowerCase().includes(term) ||
       client.companyName.toLowerCase().includes(term)
-    ).map((client: any) => ({
+    ).map(client => ({
       id: client.clientId,
       companyName: client.companyName,
       url: client.url
     }));
 
     // Search users
-    clientsData.clients.forEach((client: any) => {
-      client.users.forEach((user: any) => {
+    clientsData.clients.forEach(client => {
+      client.users.forEach(user => {
         if (
           user.email.toLowerCase().includes(term) ||
           user.role.toLowerCase().includes(term)
@@ -89,22 +71,12 @@ export default function UserManagementPage() {
     });
   }
 
-  if (isLoading) {
-    return (
-      <DashboardLayout>
-        <div>Loading...</div>
-      </DashboardLayout>
-    );
-  }
-
   const handleCreateClient = () => {
-    if (!clientsData) return;
-    const newClientId = (Math.max(...clientsData.clients.map((c: any) => parseInt(c.clientId))) + 1).toString();
+    const newClientId = (Math.max(...clientsData.clients.map(c => parseInt(c.clientId))) + 1).toString();
     setLocation(`/client-edit/${newClientId}`);
   };
 
   const handleCreateUser = () => {
-    // Redirect to user creation page with a new UID
     const newUid = `new-user-${Date.now()}`;
     setLocation(`/user-edit/${newUid}`);
   };
@@ -120,7 +92,7 @@ export default function UserManagementPage() {
 
       <div className="mb-8">
         <div className="flex justify-between items-center mb-2">
-          <div></div> {/* Placeholder to maintain similar structure */}
+          <div></div>
           <div className="flex gap-2">
             <Button
               variant="outline"
