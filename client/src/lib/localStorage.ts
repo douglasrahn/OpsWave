@@ -22,12 +22,20 @@ interface SessionInfo {
  * Get client information by Firebase UID
  */
 export function getClientByUID(uid: string): { client: Client; user: ClientUser } | null {
+  console.log("Searching for UID:", uid);
+  console.log("Available clients:", JSON.stringify(clientsData.clients, null, 2));
+
   for (const client of clientsData.clients) {
-    const user = client.users.find(u => u.uid === uid);
+    const user = client.users.find(u => {
+      console.log("Comparing UIDs:", u.uid, uid);
+      return u.uid === uid;
+    });
     if (user) {
+      console.log("Found matching user:", user);
       return { client, user };
     }
   }
+  console.log("No client found for UID:", uid);
   return null;
 }
 
