@@ -8,7 +8,7 @@ import { z } from 'zod';
 const MAKE_API_KEY = process.env.REPLIT_MAKE_API_KEY || process.env.MAKE_API_KEY;
 const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
 const MAKE_ORG_ID = process.env.REPLIT_MAKE_ORG_ID || process.env.MAKE_ORG_ID || '493039';
-const DATA_DIR = path.join(process.cwd(), 'client', 'src', 'data');
+const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
 
 // Validate required environment variables
@@ -39,7 +39,28 @@ async function ensureDataDirectory() {
   }
 }
 
+// Load initial data from client directory if server data doesn't exist
+async function initializeDataIfNeeded() {
+  try {
+    await fs.access(CLIENTS_FILE);
+  } catch {
+    const initialDataPath = path.join(process.cwd(), 'client', 'src', 'data', 'clients.json');
+    try {
+      const initialData = await fs.readFile(initialDataPath, 'utf-8');
+      await fs.writeFile(CLIENTS_FILE, initialData, 'utf-8');
+      console.log('Initialized server data from client data');
+    } catch (error) {
+      console.error('Error initializing data:', error);
+      // Create empty data structure if initial data is not available
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify({ clients: [] }, null, 2), 'utf-8');
+    }
+  }
+}
+
 export function registerRoutes(app: Express) {
+  // Initialize data on startup
+  initializeDataIfNeeded().catch(console.error);
+
   // Get client by UID
   app.get('/api/clients/user/:uid', async (req: Request, res: Response) => {
     try {
@@ -117,6 +138,16 @@ export function registerRoutes(app: Express) {
       } catch (error) {
         console.error('Error writing to clients file:', error);
         return res.status(500).json({ error: 'Error saving client data' });
+      }
+
+      // Also update the client-side data file to keep it in sync
+      const clientDataPath = path.join(process.cwd(), 'client', 'src', 'data', 'clients.json');
+      try {
+        await fs.writeFile(clientDataPath, JSON.stringify(data, null, 2), 'utf-8');
+        console.log('Client-side data updated');
+      } catch (error) {
+        console.error('Error updating client-side data:', error);
+        // Don't fail the request if client-side update fails
       }
 
       return res.json(data.clients[clientIndex]);
