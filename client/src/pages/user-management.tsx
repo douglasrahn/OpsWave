@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Edit2 } from "lucide-react";
+import { Edit2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import clientsData from "@/data/clients.json";
+import { useToast } from "@/hooks/use-toast";
 
 interface SearchResult {
   type: 'client' | 'user';
@@ -20,6 +21,7 @@ export default function UserManagementPage() {
   const [userSearch, setUserSearch] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     const results: SearchResult[] = [];
@@ -43,12 +45,13 @@ export default function UserManagementPage() {
     }
 
     if (userSearch.trim()) {
+      const searchTerm = userSearch.toLowerCase();
       clientsData.clients.forEach(client => {
         client.users
           .filter(user =>
-            user.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-            user.uid.toLowerCase().includes(userSearch.toLowerCase()) ||
-            client.clientId.toLowerCase().includes(userSearch.toLowerCase())
+            user.email.toLowerCase().includes(searchTerm) ||
+            user.uid.toLowerCase().includes(searchTerm) ||
+            client.clientId.toLowerCase().includes(searchTerm)
           )
           .forEach(user => {
             results.push({
@@ -65,6 +68,17 @@ export default function UserManagementPage() {
     setSearchResults(results);
   }, [clientSearch, userSearch]);
 
+  const handleCreateClient = () => {
+    const newClientId = (Math.max(...clientsData.clients.map(c => parseInt(c.clientId))) + 1).toString();
+    setLocation(`/client-edit/${newClientId}`);
+  };
+
+  const handleCreateUser = () => {
+    // Redirect to user creation page with a new UID
+    const newUid = `new-user-${Date.now()}`;
+    setLocation(`/user-edit/${newUid}`);
+  };
+
   return (
     <DashboardLayout>
       <div className="mb-8">
@@ -76,9 +90,20 @@ export default function UserManagementPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div>
-          <label className="text-sm font-medium mb-2 block">
-            Search Clients
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-medium">
+              Search Clients
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCreateClient}
+              className="ml-2"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Client
+            </Button>
+          </div>
           <Input
             placeholder="Search by client ID or company name..."
             value={clientSearch}
@@ -88,9 +113,20 @@ export default function UserManagementPage() {
           />
         </div>
         <div>
-          <label className="text-sm font-medium mb-2 block">
-            Search Users
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-medium">
+              Search Users
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCreateUser}
+              className="ml-2"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New User
+            </Button>
+          </div>
           <Input
             placeholder="Search by email, UID, or client ID..."
             value={userSearch}

@@ -31,6 +31,15 @@ const clientSchema = z.object({
 // Type for client data
 type Client = z.infer<typeof clientSchema>;
 
+// Ensure data directory exists
+async function ensureDataDirectory() {
+  try {
+    await fs.access(DATA_DIR);
+  } catch {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  }
+}
+
 export function registerRoutes(app: Express) {
   // Get client by UID
   app.get('/api/clients/user/:uid', async (req: Request, res: Response) => {
@@ -72,9 +81,17 @@ export function registerRoutes(app: Express) {
         }
       }
 
+      await ensureDataDirectory();
+
       // Read current data
-      const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
-      const data = JSON.parse(rawData);
+      let data;
+      try {
+        const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+        data = JSON.parse(rawData);
+      } catch (error) {
+        console.error('Error reading clients file:', error);
+        return res.status(500).json({ error: 'Error reading clients data' });
+      }
 
       // Find and update the client
       const clientIndex = data.clients.findIndex((c: Client) => c.clientId === id);
@@ -89,11 +106,103 @@ export function registerRoutes(app: Express) {
       };
 
       // Write back to file
-      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2));
+      try {
+        await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      } catch (error) {
+        console.error('Error writing to clients file:', error);
+        return res.status(500).json({ error: 'Error saving client data' });
+      }
 
       return res.json(data.clients[clientIndex]);
     } catch (error) {
       console.error('Error updating client:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Create new client endpoint
+  app.post('/api/clients', async (req: Request, res: Response) => {
+    try {
+      const newClient = req.body;
+
+      // Validate the new client data
+      try {
+        clientSchema.parse(newClient);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            error: 'Invalid data format',
+            details: error.issues.map(issue => issue.message)
+          });
+        }
+      }
+
+      await ensureDataDirectory();
+
+      // Read current data
+      let data;
+      try {
+        const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+        data = JSON.parse(rawData);
+      } catch (error) {
+        data = { clients: [] };
+      }
+
+      // Add new client
+      data.clients.push(newClient);
+
+      // Write back to file
+      try {
+        await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      } catch (error) {
+        console.error('Error writing to clients file:', error);
+        return res.status(500).json({ error: 'Error saving client data' });
+      }
+
+      return res.status(201).json(newClient);
+    } catch (error) {
+      console.error('Error creating client:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Create new user endpoint
+  app.post('/api/clients/:clientId/users', async (req: Request, res: Response) => {
+    try {
+      const { clientId } = req.params;
+      const newUser = req.body;
+
+      await ensureDataDirectory();
+
+      // Read current data
+      let data;
+      try {
+        const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+        data = JSON.parse(rawData);
+      } catch (error) {
+        return res.status(500).json({ error: 'Error reading clients data' });
+      }
+
+      // Find the client
+      const clientIndex = data.clients.findIndex((c: Client) => c.clientId === clientId);
+      if (clientIndex === -1) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
+
+      // Add new user
+      data.clients[clientIndex].users.push(newUser);
+
+      // Write back to file
+      try {
+        await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      } catch (error) {
+        console.error('Error writing to clients file:', error);
+        return res.status(500).json({ error: 'Error saving user data' });
+      }
+
+      return res.status(201).json(newUser);
+    } catch (error) {
+      console.error('Error creating user:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
