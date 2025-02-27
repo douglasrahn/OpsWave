@@ -8,7 +8,6 @@ import { useLocation } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import clientsData from "@/data/clients.json";
 import {
   Form,
   FormControl,
@@ -24,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const userSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -38,6 +38,7 @@ export default function UserEditPage({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
@@ -48,7 +49,21 @@ export default function UserEditPage({ params }: { params: { id: string } }) {
     },
   });
 
+  // Fetch all clients to find the user
+  const { data: clientsData } = useQuery({
+    queryKey: ['/api/clients'],
+    queryFn: async () => {
+      const response = await fetch('/api/clients');
+      if (!response.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+      return response.json();
+    }
+  });
+
   useEffect(() => {
+    if (!clientsData) return;
+
     // Find the user and their associated client
     for (const client of clientsData.clients) {
       const user = client.users.find(u => u.uid === params.id);
@@ -62,7 +77,7 @@ export default function UserEditPage({ params }: { params: { id: string } }) {
         break;
       }
     }
-  }, [params.id]);
+  }, [clientsData, params.id]);
 
   const onSubmit = async (data: UserFormData) => {
     if (!clientId) {
@@ -76,27 +91,25 @@ export default function UserEditPage({ params }: { params: { id: string } }) {
 
     setIsLoading(true);
     try {
-      const client = clientsData.clients.find(c => c.clientId === clientId);
-      if (!client) throw new Error("Client not found");
-
-      const updatedUsers = client.users.map(u =>
-        u.uid === params.id ? { ...u, ...data } : u
-      );
-
       const response = await fetch(`/api/clients/${clientId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ...client,
-          users: updatedUsers,
+          ...clientsData.clients.find(c => c.clientId === clientId),
+          users: clientsData.clients
+            .find(c => c.clientId === clientId)
+            ?.users.map(u => u.uid === params.id ? { ...u, ...data } : u)
         }),
       });
 
       if (!response.ok) {
         throw new Error("Failed to update user");
       }
+
+      // Invalidate the clients query to refresh the data
+      await queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
 
       toast({
         title: "Success",

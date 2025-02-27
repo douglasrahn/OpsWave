@@ -11,11 +11,6 @@ const MAKE_ORG_ID = process.env.REPLIT_MAKE_ORG_ID || process.env.MAKE_ORG_ID ||
 const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
 
-// Validate required environment variables
-if (!MAKE_API_KEY) {
-  console.warn('Warning: MAKE_API_KEY not set. Make.com API calls will fail.');
-}
-
 // Client data validation schema
 const clientSchema = z.object({
   clientId: z.string(),
@@ -39,87 +34,53 @@ async function ensureDataDirectory() {
   }
 }
 
-// Load initial data from client directory if server data doesn't exist
-async function initializeDataIfNeeded() {
-  try {
-    await fs.access(CLIENTS_FILE);
-  } catch {
-    const initialDataPath = path.join(process.cwd(), 'client', 'src', 'data', 'clients.json');
-    try {
-      const initialData = await fs.readFile(initialDataPath, 'utf-8');
-      await fs.writeFile(CLIENTS_FILE, initialData, 'utf-8');
-      console.log('Initialized server data from client data');
-    } catch (error) {
-      console.error('Error initializing data:', error);
-      // Create empty data structure if initial data is not available
-      await fs.writeFile(CLIENTS_FILE, JSON.stringify({ clients: [] }, null, 2), 'utf-8');
-    }
-  }
-}
-
 export function registerRoutes(app: Express) {
-  // Initialize data on startup
-  initializeDataIfNeeded().catch(console.error);
-
-  // Get client by UID
-  app.get('/api/clients/user/:uid', async (req: Request, res: Response) => {
+  // Get all clients
+  app.get('/api/clients', async (req: Request, res: Response) => {
     try {
-      const { uid } = req.params;
       const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
       const data = JSON.parse(rawData);
-
-      const client = data.clients.find((c: Client) => 
-        c.users.some(user => user.uid === uid)
-      );
-
-      if (!client) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      return res.json(client);
+      return res.json(data);
     } catch (error) {
-      console.error('Error fetching client by UID:', error);
+      console.error('Error fetching clients:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
-  // Client data update endpoint
+  // Get single client
+  app.get('/api/clients/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+      const data = JSON.parse(rawData);
+
+      const client = data.clients.find((c: Client) => c.clientId === id);
+      if (!client) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
+
+      return res.json(client);
+    } catch (error) {
+      console.error('Error fetching client:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Update client
   app.patch('/api/clients/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const updateData = req.body;
-      console.log('Updating client:', id, 'with data:', updateData);
-
-      // Validate the update data
-      try {
-        clientSchema.parse(updateData);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          console.error('Validation error:', error.issues);
-          return res.status(400).json({
-            error: 'Invalid data format',
-            details: error.issues.map(issue => issue.message)
-          });
-        }
-      }
 
       await ensureDataDirectory();
 
       // Read current data
-      let data;
-      try {
-        const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
-        data = JSON.parse(rawData);
-        console.log('Current data:', data);
-      } catch (error) {
-        console.error('Error reading clients file:', error);
-        return res.status(500).json({ error: 'Error reading clients data' });
-      }
+      const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+      const data = JSON.parse(rawData);
 
       // Find and update the client
       const clientIndex = data.clients.findIndex((c: Client) => c.clientId === id);
       if (clientIndex === -1) {
-        console.error('Client not found:', id);
         return res.status(404).json({ error: 'Client not found' });
       }
 
@@ -129,26 +90,9 @@ export function registerRoutes(app: Express) {
         ...updateData
       };
 
-      console.log('Updated data:', data);
-
       // Write back to file
-      try {
-        await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-        console.log('File write successful');
-      } catch (error) {
-        console.error('Error writing to clients file:', error);
-        return res.status(500).json({ error: 'Error saving client data' });
-      }
-
-      // Also update the client-side data file to keep it in sync
-      const clientDataPath = path.join(process.cwd(), 'client', 'src', 'data', 'clients.json');
-      try {
-        await fs.writeFile(clientDataPath, JSON.stringify(data, null, 2), 'utf-8');
-        console.log('Client-side data updated');
-      } catch (error) {
-        console.error('Error updating client-side data:', error);
-        // Don't fail the request if client-side update fails
-      }
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      console.log('Successfully saved client update to:', CLIENTS_FILE);
 
       return res.json(data.clients[clientIndex]);
     } catch (error) {
@@ -157,24 +101,10 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Create new client endpoint
+  // Create new client
   app.post('/api/clients', async (req: Request, res: Response) => {
     try {
       const newClient = req.body;
-      console.log('Creating new client:', newClient);
-
-      // Validate the new client data
-      try {
-        clientSchema.parse(newClient);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          console.error('Validation error:', error.issues);
-          return res.status(400).json({
-            error: 'Invalid data format',
-            details: error.issues.map(issue => issue.message)
-          });
-        }
-      }
 
       await ensureDataDirectory();
 
@@ -184,22 +114,15 @@ export function registerRoutes(app: Express) {
         const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
         data = JSON.parse(rawData);
       } catch (error) {
-        console.log('No existing clients file, creating new one');
         data = { clients: [] };
       }
 
       // Add new client
       data.clients.push(newClient);
-      console.log('Updated data with new client:', data);
 
       // Write back to file
-      try {
-        await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-        console.log('File write successful');
-      } catch (error) {
-        console.error('Error writing to clients file:', error);
-        return res.status(500).json({ error: 'Error saving client data' });
-      }
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      console.log('Successfully saved new client to:', CLIENTS_FILE);
 
       return res.status(201).json(newClient);
     } catch (error) {
@@ -208,7 +131,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Create new user endpoint
+  // Create new user
   app.post('/api/clients/:clientId/users', async (req: Request, res: Response) => {
     try {
       const { clientId } = req.params;
@@ -217,13 +140,8 @@ export function registerRoutes(app: Express) {
       await ensureDataDirectory();
 
       // Read current data
-      let data;
-      try {
-        const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
-        data = JSON.parse(rawData);
-      } catch (error) {
-        return res.status(500).json({ error: 'Error reading clients data' });
-      }
+      const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
+      const data = JSON.parse(rawData);
 
       // Find the client
       const clientIndex = data.clients.findIndex((c: Client) => c.clientId === clientId);
@@ -235,12 +153,8 @@ export function registerRoutes(app: Express) {
       data.clients[clientIndex].users.push(newUser);
 
       // Write back to file
-      try {
-        await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      } catch (error) {
-        console.error('Error writing to clients file:', error);
-        return res.status(500).json({ error: 'Error saving user data' });
-      }
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      console.log('Successfully saved new user to:', CLIENTS_FILE);
 
       return res.status(201).json(newUser);
     } catch (error) {
@@ -248,8 +162,7 @@ export function registerRoutes(app: Express) {
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
-
-  // Existing Make.com API routes remain unchanged
+  // Existing Make.com API routes
   app.get('/api/scenarios/:scenarioId', async (req, res) => {
     try {
       const { scenarioId } = req.params;

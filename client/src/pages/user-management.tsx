@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Edit2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import clientsData from "@/data/clients.json";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 interface SearchResult {
   type: 'client' | 'user';
@@ -23,7 +23,21 @@ export default function UserManagementPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  // Fetch clients data from API
+  const { data: clientsData } = useQuery({
+    queryKey: ['/api/clients'],
+    queryFn: async () => {
+      const response = await fetch('/api/clients');
+      if (!response.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+      return response.json();
+    }
+  });
+
   useEffect(() => {
+    if (!clientsData) return;
+
     const results: SearchResult[] = [];
 
     if (clientSearch.trim()) {
@@ -66,9 +80,10 @@ export default function UserManagementPage() {
     }
 
     setSearchResults(results);
-  }, [clientSearch, userSearch]);
+  }, [clientSearch, userSearch, clientsData]);
 
   const handleCreateClient = () => {
+    if (!clientsData) return;
     const newClientId = (Math.max(...clientsData.clients.map(c => parseInt(c.clientId))) + 1).toString();
     setLocation(`/client-edit/${newClientId}`);
   };

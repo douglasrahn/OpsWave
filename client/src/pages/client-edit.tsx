@@ -8,7 +8,6 @@ import { useLocation } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import clientsData from "@/data/clients.json";
 import {
   Form,
   FormControl,
@@ -17,6 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useQuery } from "@tanstack/react-query";
 
 const clientSchema = z.object({
   clientId: z.string().min(1, "Client ID is required"),
@@ -41,13 +41,29 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
     },
   });
 
+  // Fetch client data if editing existing client
+  const { data: clientData, isError, error } = useQuery({
+    queryKey: ['/api/clients', params.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/clients/${params.id}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          //Handle 404 - Client not found, treat as new client
+          return null;
+        }
+        throw new Error(`Failed to fetch client: ${response.status}`);
+      }
+      return response.json();
+    },
+    enabled: !isNewClient
+  });
+
   useEffect(() => {
-    const client = clientsData.clients.find(c => c.clientId === params.id);
-    if (client) {
+    if (clientData) {
       form.reset({
-        clientId: client.clientId,
-        companyName: client.companyName,
-        url: client.url,
+        clientId: clientData.clientId,
+        companyName: clientData.companyName,
+        url: clientData.url,
       });
     } else {
       // This is a new client
@@ -58,7 +74,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         url: "",
       });
     }
-  }, [params.id]);
+  }, [clientData, params.id]);
 
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
