@@ -11,6 +11,11 @@ const MAKE_ORG_ID = process.env.REPLIT_MAKE_ORG_ID || process.env.MAKE_ORG_ID ||
 const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
 
+// Validate required environment variables
+if (!MAKE_API_KEY) {
+  console.warn('Warning: MAKE_API_KEY not set. Make.com API calls will fail.');
+}
+
 // Client data validation schema
 const clientSchema = z.object({
   clientId: z.string(),
@@ -162,6 +167,7 @@ export function registerRoutes(app: Express) {
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
+
   // Existing Make.com API routes
   app.get('/api/scenarios/:scenarioId', async (req, res) => {
     try {
