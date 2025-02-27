@@ -13,6 +13,9 @@ import CollectionsConfigPage from "@/pages/config/collections";
 import CollectionsDashboardPage from "@/pages/collections-dashboard";
 import RawDataPage from "@/pages/raw-data";
 import CampaignsPage from "@/pages/campaigns";
+import UserManagementPage from "@/pages/user-management";
+import ClientEditPage from "@/pages/client-edit";
+import UserEditPage from "@/pages/user-edit";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +29,9 @@ function Router() {
       <Route path="/config/collections" component={CollectionsConfigPage} />
       <Route path="/collections-dashboard" component={CollectionsDashboardPage} />
       <Route path="/raw-data" component={RawDataPage} />
+      <Route path="/user-management" component={UserManagementPage} />
+      <Route path="/client-edit/:id" component={ClientEditPage} />
+      <Route path="/user-edit/:id" component={UserEditPage} />
       <Route component={NotFound} />
     </Switch>
   );
