@@ -28,7 +28,6 @@ const clientSchema = z.object({
   }))
 });
 
-// Type for client data
 type Client = z.infer<typeof clientSchema>;
 
 // Ensure data directory exists
@@ -68,12 +67,14 @@ export function registerRoutes(app: Express) {
     try {
       const { id } = req.params;
       const updateData = req.body;
+      console.log('Updating client:', id, 'with data:', updateData);
 
       // Validate the update data
       try {
         clientSchema.parse(updateData);
       } catch (error) {
         if (error instanceof z.ZodError) {
+          console.error('Validation error:', error.issues);
           return res.status(400).json({
             error: 'Invalid data format',
             details: error.issues.map(issue => issue.message)
@@ -88,6 +89,7 @@ export function registerRoutes(app: Express) {
       try {
         const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
         data = JSON.parse(rawData);
+        console.log('Current data:', data);
       } catch (error) {
         console.error('Error reading clients file:', error);
         return res.status(500).json({ error: 'Error reading clients data' });
@@ -96,6 +98,7 @@ export function registerRoutes(app: Express) {
       // Find and update the client
       const clientIndex = data.clients.findIndex((c: Client) => c.clientId === id);
       if (clientIndex === -1) {
+        console.error('Client not found:', id);
         return res.status(404).json({ error: 'Client not found' });
       }
 
@@ -105,9 +108,12 @@ export function registerRoutes(app: Express) {
         ...updateData
       };
 
+      console.log('Updated data:', data);
+
       // Write back to file
       try {
         await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+        console.log('File write successful');
       } catch (error) {
         console.error('Error writing to clients file:', error);
         return res.status(500).json({ error: 'Error saving client data' });
@@ -124,12 +130,14 @@ export function registerRoutes(app: Express) {
   app.post('/api/clients', async (req: Request, res: Response) => {
     try {
       const newClient = req.body;
+      console.log('Creating new client:', newClient);
 
       // Validate the new client data
       try {
         clientSchema.parse(newClient);
       } catch (error) {
         if (error instanceof z.ZodError) {
+          console.error('Validation error:', error.issues);
           return res.status(400).json({
             error: 'Invalid data format',
             details: error.issues.map(issue => issue.message)
@@ -145,15 +153,18 @@ export function registerRoutes(app: Express) {
         const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
         data = JSON.parse(rawData);
       } catch (error) {
+        console.log('No existing clients file, creating new one');
         data = { clients: [] };
       }
 
       // Add new client
       data.clients.push(newClient);
+      console.log('Updated data with new client:', data);
 
       // Write back to file
       try {
         await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+        console.log('File write successful');
       } catch (error) {
         console.error('Error writing to clients file:', error);
         return res.status(500).json({ error: 'Error saving client data' });

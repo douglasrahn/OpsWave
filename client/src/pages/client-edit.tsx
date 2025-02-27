@@ -63,6 +63,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
     try {
+      console.log('Submitting client data:', data);
       const endpoint = isNewClient ? '/api/clients' : `/api/clients/${params.id}`;
       const method = isNewClient ? 'POST' : 'PATCH';
 
@@ -78,7 +79,9 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
       });
 
       if (!response.ok) {
-        throw new Error(isNewClient ? "Failed to create client" : "Failed to update client");
+        const errorData = await response.json();
+        console.error('Server response:', errorData);
+        throw new Error(errorData.error || (isNewClient ? "Failed to create client" : "Failed to update client"));
       }
 
       toast({
@@ -87,6 +90,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
       });
       setLocation("/user-management");
     } catch (error) {
+      console.error('Error saving client:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save client",
