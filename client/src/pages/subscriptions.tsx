@@ -2,7 +2,6 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubscriptionTable } from "@/components/subscriptions/SubscriptionTable";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import clientsData from "@/data/clients.json";
 
 interface Client {
   id: string;
@@ -17,10 +16,16 @@ export default function SubscriptionsPage() {
   const { toast } = useToast();
 
   const { data: clients, isLoading } = useQuery<Client[]>({
-    queryKey: ["clients"],
+    queryKey: ["/api/clients"],
     queryFn: async () => {
-      // Transform local data to match the interface
-      return clientsData.clients.map(client => ({
+      const response = await fetch('/api/clients');
+      if (!response.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+      const data = await response.json();
+
+      // Transform client data to match the interface
+      return data.clients.map((client: any) => ({
         id: client.clientId,
         companyName: client.companyName,
         url: client.url,

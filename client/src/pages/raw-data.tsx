@@ -4,7 +4,7 @@ import { TableEditor } from "@/components/raw-data/TableEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Database, FileSpreadsheet, Users, Settings, Loader2 } from "lucide-react";
-import clientsData from "@/data/clients.json";
+import { useQuery } from "@tanstack/react-query";
 
 // List of available tables with improved metadata
 const TABLES = [
@@ -28,21 +28,34 @@ export default function RawDataPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  const { data: clientsData } = useQuery({
+    queryKey: ['/api/clients'],
+    queryFn: async () => {
+      const response = await fetch('/api/clients');
+      if (!response.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+      return response.json();
+    }
+  });
+
   const loadTableData = (tableName: string) => {
     setIsLoading(true);
     try {
       let data: any[] = [];
 
-      // Load data from local JSON based on table name
+      // Load data based on table name
       switch (tableName) {
         case "clients":
-          data = clientsData.clients.map(client => ({
-            id: client.clientId,
-            ...client
-          }));
+          if (clientsData) {
+            data = clientsData.clients.map(client => ({
+              id: client.clientId,
+              ...client
+            }));
+          }
           break;
         case "campaigns":
-          // We'll implement this when we add campaigns.json
+          // We'll implement this when we add campaigns
           data = [];
           break;
         default:

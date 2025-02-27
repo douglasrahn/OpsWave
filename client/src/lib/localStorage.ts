@@ -1,5 +1,3 @@
-import clientsData from '@/data/clients.json';
-
 interface ClientUser {
   email: string;
   role: string;
@@ -21,29 +19,31 @@ interface SessionInfo {
 /**
  * Get client information by Firebase UID
  */
-export function getClientByUID(uid: string): { client: Client; user: ClientUser } | null {
-  console.log("Searching for UID:", uid);
-  console.log("Available clients:", JSON.stringify(clientsData.clients, null, 2));
+export async function getClientByUID(uid: string): Promise<{ client: Client; user: ClientUser } | null> {
+  try {
+    const response = await fetch(`/api/clients/user/${uid}`);
+    if (!response.ok) {
+      console.error('Failed to fetch client data');
+      return null;
+    }
 
-  for (const client of clientsData.clients) {
-    const user = client.users.find(u => {
-      console.log("Comparing UIDs:", u.uid, uid);
-      return u.uid === uid;
-    });
+    const client = await response.json();
+    const user = client.users.find(u => u.uid === uid);
+
     if (user) {
-      console.log("Found matching user:", user);
       return { client, user };
     }
+  } catch (error) {
+    console.error('Error fetching client data:', error);
   }
-  console.log("No client found for UID:", uid);
   return null;
 }
 
 /**
  * Save session information after successful authentication
  */
-export function saveSessionInfo(uid: string): boolean {
-  const clientInfo = getClientByUID(uid);
+export async function saveSessionInfo(uid: string): Promise<boolean> {
+  const clientInfo = await getClientByUID(uid);
   if (!clientInfo) {
     console.error("No client found for UID:", uid);
     return false;

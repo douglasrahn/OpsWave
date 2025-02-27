@@ -2,7 +2,6 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { UserTable } from "@/components/users/UserTable";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { useQuery } from "@tanstack/react-query";
-import clientsData from "@/data/clients.json";
 
 interface User {
   id: string;
@@ -13,10 +12,16 @@ interface User {
 
 export default function UsersPage() {
   const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ["users"],
+    queryKey: ["/api/clients"],
     queryFn: async () => {
+      const response = await fetch('/api/clients');
+      if (!response.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+      const data = await response.json();
+
       // Transform client user data to match the interface
-      return clientsData.clients.flatMap(client => 
+      return data.clients.flatMap(client => 
         client.users.map(user => ({
           id: user.uid,
           email: user.email,
