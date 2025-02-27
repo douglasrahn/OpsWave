@@ -30,6 +30,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const [isNewClient, setIsNewClient] = useState(false);
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
@@ -49,39 +50,46 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         url: client.url,
       });
     } else {
-      toast({
-        title: "Error",
-        description: "Client not found",
-        variant: "destructive",
+      // This is a new client
+      setIsNewClient(true);
+      form.reset({
+        clientId: params.id,
+        companyName: "",
+        url: "",
       });
-      setLocation("/user-management");
     }
   }, [params.id]);
 
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/clients/${params.id}`, {
-        method: "PATCH",
+      const endpoint = isNewClient ? '/api/clients' : `/api/clients/${params.id}`;
+      const method = isNewClient ? 'POST' : 'PATCH';
+
+      const response = await fetch(endpoint, {
+        method: method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          users: [] // Initialize empty users array for new clients
+        }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update client");
+        throw new Error(isNewClient ? "Failed to create client" : "Failed to update client");
       }
 
       toast({
         title: "Success",
-        description: "Client updated successfully",
+        description: isNewClient ? "Client created successfully" : "Client updated successfully",
       });
       setLocation("/user-management");
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update client",
+        description: error instanceof Error ? error.message : "Failed to save client",
         variant: "destructive",
       });
     } finally {
@@ -92,9 +100,9 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   return (
     <DashboardLayout>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Edit Client</h1>
+        <h1 className="text-3xl font-bold">{isNewClient ? "Create Client" : "Edit Client"}</h1>
         <p className="text-muted-foreground mt-2">
-          Update client information
+          {isNewClient ? "Add a new client to the system" : "Update client information"}
         </p>
       </div>
 
@@ -149,7 +157,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
 
               <div className="flex gap-4">
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Saving..." : "Save Changes"}
+                  {isLoading ? "Saving..." : (isNewClient ? "Create Client" : "Save Changes")}
                 </Button>
                 <Button
                   type="button"
