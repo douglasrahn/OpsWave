@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     // Find the client in our JSON data
     const client = clientsData.clients.find(c => c.clientId === params.id);
+    console.log('[Client Edit] Loading client data:', client);
 
     if (client) {
       // Existing client - populate form
@@ -68,8 +69,13 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
     try {
+      console.log('[Client Edit] Submitting data:', data);
+      console.log('[Client Edit] isNewClient:', isNewClient);
+
       const endpoint = isNewClient ? '/api/clients' : `/api/clients/${params.id}`;
       const method = isNewClient ? 'POST' : 'PATCH';
+
+      console.log('[Client Edit] Making request to:', endpoint, 'with method:', method);
 
       const response = await fetch(endpoint, {
         method: method,
@@ -78,7 +84,7 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         },
         body: JSON.stringify({
           ...data,
-          users: [] // Initialize empty users array for new clients
+          users: isNewClient ? [] : undefined // Only include empty users array for new clients
         }),
       });
 
@@ -87,13 +93,16 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         throw new Error(errorData.error || (isNewClient ? "Failed to create client" : "Failed to update client"));
       }
 
+      const savedData = await response.json();
+      console.log('[Client Edit] Server response:', savedData);
+
       toast({
         title: "Success",
         description: isNewClient ? "Client created successfully" : "Client updated successfully",
       });
       setLocation("/user-management");
     } catch (error) {
-      console.error('Error saving client:', error);
+      console.error('[Client Edit] Error saving client:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save client",

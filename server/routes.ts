@@ -1,34 +1,9 @@
 import type { Express, Request, Response } from "express";
-import fetch from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
-import { z } from 'zod';
 
-// Prioritize Replit secrets over local .env
-const MAKE_API_KEY = process.env.REPLIT_MAKE_API_KEY || process.env.MAKE_API_KEY;
-const MAKE_API_BASE_URL = 'https://us1.make.com/api/v2';
-const MAKE_ORG_ID = process.env.REPLIT_MAKE_ORG_ID || process.env.MAKE_ORG_ID || '493039';
 const DATA_DIR = path.join(process.cwd(), 'server', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
-
-// Validate required environment variables
-if (!MAKE_API_KEY) {
-  console.warn('Warning: MAKE_API_KEY not set. Make.com API calls will fail.');
-}
-
-// Client data validation schema
-const clientSchema = z.object({
-  clientId: z.string(),
-  companyName: z.string().min(1),
-  url: z.string().url(),
-  users: z.array(z.object({
-    email: z.string().email(),
-    role: z.string(),
-    uid: z.string()
-  }))
-});
-
-type Client = z.infer<typeof clientSchema>;
 
 // Ensure data directory exists
 async function ensureDataDirectory() {
@@ -59,7 +34,7 @@ export function registerRoutes(app: Express) {
       const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
       const data = JSON.parse(rawData);
 
-      const client = data.clients.find((c: Client) => c.clientId === id);
+      const client = data.clients.find((c: any) => c.clientId === id);
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
@@ -77,28 +52,25 @@ export function registerRoutes(app: Express) {
       const { id } = req.params;
       const updateData = req.body;
 
-      await ensureDataDirectory();
-
       // Read current data
       const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
       const data = JSON.parse(rawData);
 
       // Find and update the client
-      const clientIndex = data.clients.findIndex((c: Client) => c.clientId === id);
+      const clientIndex = data.clients.findIndex((c: any) => c.clientId === id);
       if (clientIndex === -1) {
         return res.status(404).json({ error: 'Client not found' });
       }
 
-      // Update the client data
+      // Update the client data while preserving users array
       data.clients[clientIndex] = {
         ...data.clients[clientIndex],
-        ...updateData
+        companyName: updateData.companyName,
+        url: updateData.url,
       };
 
       // Write back to file
-      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      console.log('Successfully saved client update to:', CLIENTS_FILE);
-
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2));
       return res.json(data.clients[clientIndex]);
     } catch (error) {
       console.error('Error updating client:', error);
@@ -111,31 +83,32 @@ export function registerRoutes(app: Express) {
     try {
       const newClient = req.body;
 
+      // Ensure data directory exists
       await ensureDataDirectory();
 
-      // Read current data
+      // Read current data or initialize new data structure
       let data;
       try {
         const rawData = await fs.readFile(CLIENTS_FILE, 'utf-8');
         data = JSON.parse(rawData);
-      } catch (error) {
+      } catch {
         data = { clients: [] };
       }
 
       // Add new client
-      data.clients.push(newClient);
+      data.clients.push({
+        ...newClient,
+        users: [] // Initialize empty users array for new clients
+      });
 
       // Write back to file
-      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      console.log('Successfully saved new client to:', CLIENTS_FILE);
-
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2));
       return res.status(201).json(newClient);
     } catch (error) {
       console.error('Error creating client:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
-
   // Create new user
   app.post('/api/clients/:clientId/users', async (req: Request, res: Response) => {
     try {
@@ -149,7 +122,7 @@ export function registerRoutes(app: Express) {
       const data = JSON.parse(rawData);
 
       // Find the client
-      const clientIndex = data.clients.findIndex((c: Client) => c.clientId === clientId);
+      const clientIndex = data.clients.findIndex((c: any) => c.clientId === clientId);
       if (clientIndex === -1) {
         return res.status(404).json({ error: 'Client not found' });
       }
@@ -158,7 +131,7 @@ export function registerRoutes(app: Express) {
       data.clients[clientIndex].users.push(newUser);
 
       // Write back to file
-      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      await fs.writeFile(CLIENTS_FILE, JSON.stringify(data, null, 2));
       console.log('Successfully saved new user to:', CLIENTS_FILE);
 
       return res.status(201).json(newUser);

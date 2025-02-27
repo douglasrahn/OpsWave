@@ -4,7 +4,7 @@ import { setupVite } from "./vite";
 import { registerRoutes } from "./routes";
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 // Basic middleware setup
 app.use(express.json());
@@ -42,6 +42,17 @@ async function startServer() {
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
       console.error('Error:', err.message);
       res.status(500).json({ error: 'Internal Server Error' });
+    });
+
+    // Handle port in use error
+    server.on('error', (e: any) => {
+      if (e.code === 'EADDRINUSE') {
+        console.log(`Port ${PORT} is already in use. Retrying in 1 second...`);
+        setTimeout(() => {
+          server.close();
+          server.listen(PORT, '0.0.0.0');
+        }, 1000);
+      }
     });
 
     // Handle graceful shutdown
