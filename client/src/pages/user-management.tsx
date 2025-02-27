@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Edit2, Plus } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -31,18 +30,27 @@ interface SearchResults {
 export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [, setLocation] = useLocation();
+  const [isLoading, setIsLoading] = useState(true);
+  const [clientsData, setClientsData] = useState<any>(null);
 
-  // Fetch clients data from API
-  const { data: clientsData, isLoading } = useQuery({
-    queryKey: ['/api/clients'],
-    queryFn: async () => {
-      const response = await fetch('/api/clients');
-      if (!response.ok) {
-        throw new Error('Failed to fetch clients');
+  // Load clients data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/clients');
+        if (!response.ok) {
+          throw new Error('Failed to fetch clients');
+        }
+        const data = await response.json();
+        setClientsData(data);
+      } catch (error) {
+        console.error('Error loading clients data:', error);
+      } finally {
+        setIsLoading(false);
       }
-      return response.json();
-    }
-  });
+    };
+    fetchData();
+  }, []);
 
   // Filter data based on search term
   const searchResults: SearchResults = {
@@ -50,22 +58,22 @@ export default function UserManagementPage() {
     users: []
   };
 
-  if (clientsData && searchTerm.trim()) {
+  if (clientsData?.clients && searchTerm.trim()) {
     const term = searchTerm.toLowerCase();
 
     // Search clients
-    searchResults.clients = clientsData.clients.filter(client => 
+    searchResults.clients = clientsData.clients.filter((client: any) => 
       client.clientId.toLowerCase().includes(term) ||
       client.companyName.toLowerCase().includes(term)
-    ).map(client => ({
+    ).map((client: any) => ({
       id: client.clientId,
       companyName: client.companyName,
       url: client.url
     }));
 
     // Search users
-    clientsData.clients.forEach(client => {
-      client.users.forEach(user => {
+    clientsData.clients.forEach((client: any) => {
+      client.users.forEach((user: any) => {
         if (
           user.email.toLowerCase().includes(term) ||
           user.role.toLowerCase().includes(term)
@@ -91,7 +99,7 @@ export default function UserManagementPage() {
 
   const handleCreateClient = () => {
     if (!clientsData) return;
-    const newClientId = (Math.max(...clientsData.clients.map(c => parseInt(c.clientId))) + 1).toString();
+    const newClientId = (Math.max(...clientsData.clients.map((c: any) => parseInt(c.clientId))) + 1).toString();
     setLocation(`/client-edit/${newClientId}`);
   };
 
