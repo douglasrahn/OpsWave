@@ -1,7 +1,7 @@
 {
   "clients": [
     {
-      "clientId": "client1",
+      "clientId": "1",
       "companyName": "Test Company Inc",
       "url": "https://testcompany.com",
       "users": [
