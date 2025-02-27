@@ -9,7 +9,6 @@ import { useQuery } from "@tanstack/react-query";
 import { toggleScenario, getScenarioStatus, type ScenarioResponse } from "@/lib/make-api";
 import { getCurrentClientId } from "@/lib/auth";
 import { useLocation } from "wouter";
-import clientsData from "@/data/clients.json";
 
 // Only store configuration, no status
 interface ScenarioSettings {
@@ -46,10 +45,15 @@ export default function CollectionsDashboardPage() {
           throw new Error("Please log in again");
         }
 
-        // Find client in local JSON data
-        const client = clientsData.clients.find(c => c.clientId === clientId);
+        // Fetch client data from API
+        const response = await fetch(`/api/clients/${clientId}`);
+        if (!response.ok) {
+          console.error("[Dashboard] Failed to fetch client:", response.status);
+          throw new Error("Failed to fetch client data");
+        }
+        const client = await response.json();
         if (!client) {
-          console.error("[Dashboard] Client not found in local data:", clientId);
+          console.error("[Dashboard] Client not found:", clientId);
           throw new Error("Client not found");
         }
 
