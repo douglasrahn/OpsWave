@@ -69,13 +69,8 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
     try {
-      console.log('[Client Edit] Submitting data:', data);
-      console.log('[Client Edit] isNewClient:', isNewClient);
-
       const endpoint = isNewClient ? '/api/clients' : `/api/clients/${params.id}`;
       const method = isNewClient ? 'POST' : 'PATCH';
-
-      console.log('[Client Edit] Making request to:', endpoint, 'with method:', method);
 
       const response = await fetch(endpoint, {
         method: method,
@@ -84,17 +79,13 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
         },
         body: JSON.stringify({
           ...data,
-          users: isNewClient ? [] : undefined // Only include empty users array for new clients
+          users: isNewClient ? [] : undefined
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || (isNewClient ? "Failed to create client" : "Failed to update client"));
+        throw new Error(isNewClient ? "Failed to create client" : "Failed to update client");
       }
-
-      const savedData = await response.json();
-      console.log('[Client Edit] Server response:', savedData);
 
       toast({
         title: "Success",
