@@ -17,9 +17,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-// Import the JSON file directly
-import clientsData from "../../../server/data/clients.json";
-
 const clientSchema = z.object({
   clientId: z.string().min(1, "Client ID is required"),
   companyName: z.string().min(1, "Company name is required"),
@@ -44,27 +41,38 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
   });
 
   useEffect(() => {
-    // Find the client in our JSON data
-    const client = clientsData.clients.find(c => c.clientId === params.id);
-    console.log('[Client Edit] Loading client data:', client);
+    const loadClient = async () => {
+      try {
+        const response = await fetch(`/api/clients/${params.id}`);
+        if (response.ok) {
+          const client = await response.json();
+          // Existing client - populate form
+          form.reset({
+            clientId: client.clientId,
+            companyName: client.companyName,
+            url: client.url,
+          });
+        } else {
+          // New client
+          setIsNewClient(true);
+          form.reset({
+            clientId: params.id,
+            companyName: "",
+            url: "",
+          });
+        }
+      } catch (error) {
+        console.error('Error loading client:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load client data",
+          variant: "destructive",
+        });
+      }
+    };
 
-    if (client) {
-      // Existing client - populate form
-      form.reset({
-        clientId: client.clientId,
-        companyName: client.companyName,
-        url: client.url,
-      });
-    } else {
-      // New client
-      setIsNewClient(true);
-      form.reset({
-        clientId: params.id,
-        companyName: "",
-        url: "",
-      });
-    }
-  }, [params.id, form]);
+    loadClient();
+  }, [params.id, form, toast]);
 
   const onSubmit = async (data: ClientFormData) => {
     setIsLoading(true);
@@ -93,7 +101,6 @@ export default function ClientEditPage({ params }: { params: { id: string } }) {
       });
       setLocation("/user-management");
     } catch (error) {
-      console.error('[Client Edit] Error saving client:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save client",
